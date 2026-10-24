@@ -45,6 +45,7 @@ private fun iniciais(nome: String): String {
     return (if (p.size > 1 && p[0].any { !it.isDigit() }) "${p[0][0]}${p.last()[0]}" else p[0].take(2)).uppercase()
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EcraPrincipal(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
@@ -59,7 +60,7 @@ fun EcraPrincipal(vm: AppViewModel) {
     // Tocar numa notificação de mensagem abre logo essa conversa
     val pedido by vm.abrirConversa.collectAsState()
     LaunchedEffect(pedido) {
-        pedido?.let { tab = 1; conversaCom = it; vm.pedirConversa(null) }
+        pedido?.let { tab = 2; conversaCom = it; vm.pedirConversa(null) }
     }
     // Sempre que a app volta ao ecrã, procura atualizações (no máximo de 10 em 10 min)
     val escopo = rememberCoroutineScope()
@@ -80,10 +81,20 @@ fun EcraPrincipal(vm: AppViewModel) {
                     Text("IssaFone", style = MaterialTheme.typography.titleLarge)
                     Text(" ${pt.ipca.issafone.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray, modifier = Modifier.weight(1f))
-                    TextButton(onClick = {
-                        escopo.launch { pt.ipca.issafone.atualizacao.Atualizador.verificarEInstalar(ctx, manual = true) }
-                    }) { Text("Atualizar") }
-                    TextButton(onClick = { vm.sair() }) { Text("Sair") }
+                    val tema by vm.tema.collectAsState()
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        TextButton(onClick = { menu = true }) { Text("⋮", fontSize = 22.sp) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text("Procurar atualizações") }, onClick = {
+                                menu = false
+                                escopo.launch { pt.ipca.issafone.atualizacao.Atualizador.verificarEInstalar(ctx, manual = true) }
+                            })
+                            DropdownMenuItem(text = { Text("Tema: ${tema.rotulo}") }, onClick = { vm.mudarTema() })
+                            HorizontalDivider()
+                            DropdownMenuItem(text = { Text("Sair", color = Vermelho) }, onClick = { menu = false; vm.sair() })
+                        }
+                    }
                 }
                 Text("Telefone: $registo", style = MaterialTheme.typography.bodySmall)
                 Text("Chat: $estadoChat", style = MaterialTheme.typography.bodySmall)
@@ -94,8 +105,12 @@ fun EcraPrincipal(vm: AppViewModel) {
         },
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(tab == 0, { tab = 0; conversaCom = null }, icon = { Text("📞") }, label = { Text("Teclado") })
-                NavigationBarItem(tab == 1, { tab = 1 }, icon = { Text("💬") }, label = { Text("Chat") })
+                val perdidas by vm.sip.registoChamadas.perdidas.collectAsState()
+                NavigationBarItem(tab == 0, { tab = 0; conversaCom = null }, icon = { Text("⌨") }, label = { Text("Teclado") })
+                NavigationBarItem(tab == 1, { tab = 1; vm.sip.registoChamadas.marcarVistas() },
+                    icon = { BadgedBox(badge = { if (perdidas > 0) Badge { Text("$perdidas") } }) { Text("📞") } },
+                    label = { Text("Chamadas") })
+                NavigationBarItem(tab == 2, { tab = 2 }, icon = { Text("💬") }, label = { Text("Chat") })
             }
         }
     ) { pad ->
@@ -105,6 +120,7 @@ fun EcraPrincipal(vm: AppViewModel) {
                 Box(Modifier.weight(1f)) {
                     when {
                         tab == 0 -> Teclado(onChamar = { n, video -> vm.sip.chamar(n, video) })
+                        tab == 1 -> ListaChamadas(vm)
                         conversaCom != null -> Conversa(vm, conversaCom!!,
                             onVoltar = { conversaCom = null },
                             onLigar = { jid, video -> vm.sip.chamar(jid.substringBefore("@"), video); tab = 0 })
@@ -157,6 +173,80 @@ private fun Teclado(onChamar: (String, Boolean) -> Unit) {
             ) { Text("Vídeo") }
         }
     }
+}
+
+/* ============================== Registo de chamadas ============================== */
+
+@Composable
+private fun ListaChamadas(vm: AppViewModel) {
+    val lista by vm.sip.registoChamadas.lista.collectAsState()
+    val contactos by vm.xmpp.contactos.collectAsState()
+    var limpar by remember { mutableStateOf(false) }
+    // Enquanto o registo está aberto, as perdidas contam como vistas
+    LaunchedEffect(lista.size) { vm.sip.registoChamadas.marcarVistas() }
+
+    val hoje = remember { java.util.Calendar.getInstance() }
+    val fmtH = remember { SimpleDateFormat("HH:mm", Locale("pt", "PT")) }
+    val fmtD = remember { SimpleDateFormat("dd/MM HH:mm", Locale("pt", "PT")) }
+    fun quando(h: Long): String {
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = h }
+        val mesmoDia = c.get(java.util.Calendar.YEAR) == hoje.get(java.util.Calendar.YEAR) &&
+            c.get(java.util.Calendar.DAY_OF_YEAR) == hoje.get(java.util.Calendar.DAY_OF_YEAR)
+        return if (mesmoDia) "hoje ${fmtH.format(Date(h))}" else fmtD.format(Date(h))
+    }
+    fun duracao(s: Int) = if (s >= 3600) "%dh %02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("CHAMADAS RECENTES", style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.weight(1f))
+            if (lista.isNotEmpty()) TextButton(onClick = { limpar = true }) { Text("Limpar") }
+        }
+        if (lista.isEmpty()) {
+            Text("Ainda não há chamadas.", color = Color.Gray, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(32.dp))
+        }
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(lista) { c ->
+                val nome = contactos.firstOrNull { it.jid.substringBefore("@") == c.numero }?.nome ?: c.nome
+                val (seta, cor, rotulo) = when (c.tipo) {
+                    "feita" -> Triple("↗", Azul, "Feita")
+                    "recebida" -> Triple("↙", Verde, "Recebida")
+                    "recusada" -> Triple("↙", Vermelho, "Recusada")
+                    else -> Triple("↙", Vermelho, "Perdida")
+                }
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.sip.chamar(c.numero, false) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(seta, color = cor, fontSize = 22.sp, modifier = Modifier.width(30.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(nome, style = MaterialTheme.typography.titleMedium,
+                            color = if (c.tipo == "perdida") Vermelho else MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            listOfNotNull(
+                                rotulo + if (c.video) " · vídeo" else "",
+                                c.numero.takeIf { it != nome },
+                                quando(c.hora),
+                                c.duracao.takeIf { it > 0 }?.let { duracao(it) }
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall, color = Color.Gray
+                        )
+                    }
+                    TextButton(onClick = { vm.sip.chamar(c.numero, true) }) { Text("🎥") }
+                }
+                HorizontalDivider()
+            }
+        }
+    }
+
+    if (limpar) AlertDialog(
+        onDismissRequest = { limpar = false },
+        title = { Text("Limpar registo") },
+        text = { Text("Apagar todas as chamadas do registo deste telemóvel?") },
+        confirmButton = { Button(onClick = { vm.sip.registoChamadas.limpar(); limpar = false }) { Text("Limpar") } },
+        dismissButton = { TextButton(onClick = { limpar = false }) { Text("Cancelar") } }
+    )
 }
 
 /* ============================== Chamada ============================== */

@@ -42,6 +42,10 @@ class SipManager(context: Context) {
 
     private var dominio = ""
 
+    /** Registo de chamadas (feitas, recebidas, perdidas, recusadas). */
+    val registoChamadas = RegistoChamadas(context)
+    private var videoNaChamada = false
+
     private val listener = object : CoreListenerStub() {
         override fun onAccountRegistrationStateChanged(
             core: Core, account: Account, state: RegistrationState, message: String
@@ -58,6 +62,9 @@ class SipManager(context: Context) {
         override fun onCallStateChanged(core: Core, call: Call, state: Call.State, message: String) {
             val remoto = call.remoteAddress.username ?: call.remoteAddress.asStringUriOnly()
             val video = call.currentParams.isVideoEnabled
+            if (video || call.remoteParams?.isVideoEnabled == true && state == Call.State.IncomingReceived ||
+                (state == Call.State.OutgoingInit && call.params.isVideoEnabled)) videoNaChamada = true
+            if (state == Call.State.Released) registar(call, remoto)
             val nome = call.remoteAddress.displayName?.takeIf { it.isNotBlank() && it != remoto } ?: ""
             val novo = when (state) {
                 Call.State.IncomingReceived -> {
@@ -80,6 +87,23 @@ class SipManager(context: Context) {
             }
             _chamada.value = if (novo.remoto.isNotEmpty() && novo.nome.isEmpty()) novo.copy(nome = nome) else novo
         }
+    }
+
+    /** Junta a chamada que acabou ao registo. */
+    private fun registar(call: Call, numero: String) {
+        val log = call.callLog
+        val tipo = when {
+            call.dir == Call.Dir.Outgoing -> "feita"
+            log.status == Call.Status.Success -> "recebida"
+            log.status == Call.Status.Declined -> "recusada"
+            else -> "perdida"
+        }
+        val nome = call.remoteAddress.displayName?.takeIf { it.isNotBlank() } ?: numero
+        registoChamadas.juntar(
+            Chamada(numero, nome, tipo, videoNaChamada, log.startDate * 1000L,
+                if (log.status == Call.Status.Success) log.duration else 0)
+        )
+        videoNaChamada = false
     }
 
     init {
@@ -107,6 +131,7 @@ class SipManager(context: Context) {
 
     fun ligar(utilizador: String, password: String, servidor: String, porta: Int = 5060) {
         dominio = servidor
+        registoChamadas.usarConta("$utilizador@$servidor")
         // Limpa contas anteriores
         core.clearAccounts()
         core.clearAllAuthInfo()

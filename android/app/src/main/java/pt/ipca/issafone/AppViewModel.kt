@@ -35,6 +35,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val estadoAtualizacao = Atualizador.estado
 
+    private val _tema = MutableStateFlow(ConfigStore.tema(app))
+    val tema: StateFlow<pt.ipca.issafone.ui.ModoTema> = _tema
+    fun mudarTema() {
+        val novo = _tema.value.seguinte()
+        ConfigStore.definirTema(getApplication(), novo)
+        _tema.value = novo
+    }
+
     fun entrar(c: Config) {
         ConfigStore.guardar(getApplication(), c)
         ConfigStore.definirSessaoAtiva(getApplication(), true)

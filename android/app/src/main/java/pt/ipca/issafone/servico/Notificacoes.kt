@@ -118,6 +118,19 @@ object Notificacoes {
         notificar(ctx, ID_MENSAGEM_BASE + (de.hashCode() and 0xFFFF), n)
     }
 
+    /** Chamada perdida (com a app em segundo plano). */
+    fun chamadaPerdida(ctx: Context, nome: String) {
+        val n = NotificationCompat.Builder(ctx, CANAL_MENSAGENS)
+            .setSmallIcon(android.R.drawable.sym_call_missed)
+            .setContentTitle("Chamada perdida")
+            .setContentText(nome)
+            .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
+            .setContentIntent(abrirApp(ctx, 50))
+            .setAutoCancel(true)
+            .build()
+        notificar(ctx, 4000 + (nome.hashCode() and 0xFFF), n)
+    }
+
     /** Atualização descarregada que precisa de um toque para ser instalada. */
     fun atualizacaoPronta(ctx: Context, versao: String, confirmar: Intent) {
         val pi = PendingIntent.getActivity(

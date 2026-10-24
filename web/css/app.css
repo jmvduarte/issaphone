@@ -16,8 +16,9 @@
   --raio: 14px;
   color-scheme: light;
 }
+/* Tema escuro: automático (segue o sistema) ou escolhido no botão ◐ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --fundo: #0F1218;
     --superficie: #181C25;
     --superficie-2: #222836;
@@ -27,6 +28,16 @@
     --bolha-dele: #262D3B;
     color-scheme: dark;
   }
+}
+:root[data-tema="escuro"] {
+  --fundo: #0F1218;
+  --superficie: #181C25;
+  --superficie-2: #222836;
+  --texto: #EEF1F6;
+  --texto-2: #9AA3B5;
+  --linha: #2C3342;
+  --bolha-dele: #262D3B;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -121,7 +132,7 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--texto-2); }
 .corpo[data-vista="conversa"] .conversa { display: flex; }
 
 .separadores {
-  display: grid; grid-template-columns: 1fr 1fr;
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
   background: var(--superficie);
   border-top: 1px solid var(--linha);
   padding-bottom: env(safe-area-inset-bottom);
@@ -282,3 +293,20 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--texto-2); }
 .chamada.com-video .chamada-cartao { position: relative; background: rgb(0 0 0 / .45); padding: 14px 18px; border-radius: 20px; }
 .chamada.com-video .avatar, .chamada.com-video h2 { display: none; }
 .chamada.com-video .chamada-botoes { margin-top: 10px; }
+
+/* ---------- Conversas / Chamadas ---------- */
+.abas-lista { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--linha); flex: none; }
+.abas-lista button { padding: 11px; color: var(--texto-2); font-weight: 600; }
+.abas-lista button.ativo { color: var(--azul); box-shadow: inset 0 -3px 0 var(--azul); }
+.contactos[data-lista="chamadas"] #lista-conversas,
+.contactos[data-lista="conversas"] #lista-chamadas { display: none; }
+#registo li { display: flex; align-items: center; border-bottom: 1px solid var(--linha); }
+#registo li > button.chamada-linha { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 11px 14px; text-align: left; }
+#registo li > button.chamada-linha:hover { background: var(--superficie-2); }
+#registo .seta { width: 26px; text-align: center; font-size: 18px; flex: none; }
+#registo .seta.cor-verde { color: var(--ok); }
+#registo .seta.cor-vermelha { color: var(--erro); }
+#registo .seta.cor-azul { color: var(--azul); }
+#registo li.perdida strong { color: var(--erro); }
+#registo .rapido { padding: 8px 12px; color: var(--azul); font-size: 18px; }
+#registo .rapido:hover { background: var(--superficie-2); }

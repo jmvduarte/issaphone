@@ -60,6 +60,42 @@ const Historico = {
   apagar(jid) { const t = this.tudo(); delete t[jid]; guardar(this.chave(), t); },
 };
 
+/* ======================= Registo de chamadas ======================= */
+
+const Registo = {
+  chave: () => `issafone.chamadas.${cfg.extensao}@${cfg.dominioXmpp}`,
+  chaveVistas: () => `issafone.chamadas-vistas.${cfg.extensao}`,
+  tudo() { return ler(this.chave()) || []; },
+  /** tipo: 'feita' | 'recebida' | 'perdida' | 'recusada' */
+  juntar(e) {
+    const lista = [e, ...this.tudo()].slice(0, 200);
+    guardar(this.chave(), lista);
+  },
+  limpar() { guardar(this.chave(), []); },
+  /** Chamadas perdidas desde a última vez que se abriu o registo. */
+  perdidasPorVer() {
+    const vistas = ler(this.chaveVistas()) || 0;
+    return this.tudo().filter((c) => c.tipo === 'perdida' && c.hora > vistas).length;
+  },
+  marcarVistas() { guardar(this.chaveVistas(), Date.now()); },
+};
+
+/* ======================= Tema (automático / claro / escuro) ======================= */
+
+const Tema = {
+  modos: ['auto', 'claro', 'escuro'],
+  nomes: { auto: '◐ Automático', claro: '☀ Claro', escuro: '☾ Escuro' },
+  atual() { try { return localStorage.getItem('issafone.tema') || 'auto'; } catch { return 'auto'; } },
+  aplicar(modo) {
+    if (modo === 'auto') delete document.documentElement.dataset.tema;
+    else document.documentElement.dataset.tema = modo;
+    try { localStorage.setItem('issafone.tema', modo); } catch { /* sem armazenamento */ }
+    const b = $('#btn-tema');
+    if (b) { b.textContent = this.nomes[modo]; b.title = 'Tema: carrega para mudar'; }
+  },
+  seguinte() { this.aplicar(this.modos[(this.modos.indexOf(this.atual()) + 1) % 3]); },
+};
+
 /* ======================= Áudio: toque de chamada ======================= */
 
 const Toque = {
@@ -155,6 +191,7 @@ const Sip = {
     destino = destino.trim();
     if (!destino || !this.ua || this.sessao) return;
     const uri = destino.includes('@') ? `sip:${destino}` : `sip:${destino}@${cfg.servidor}`;
+    this.proximaVideo = video;
     try {
       this.ua.call(uri, this.opcoes(video));
     } catch (e) {
@@ -174,6 +211,9 @@ const Sip = {
     const ofereceVideo = recebida && /\bm=video\s+[1-9]/.test(request?.body || '');
     const numero = s.remote_identity.uri.user || '';
     const nome = s.remote_identity.display_name || UI.nomeExt(numero);
+    // Para o registo de chamadas
+    this.info = { numero, nome, recebida, video: recebida ? ofereceVideo : Boolean(this.proximaVideo), atendida: false, recusei: false };
+    this.proximaVideo = false;
 
     let ligado = false;
     const ligarMedia = (pc) => {
@@ -220,6 +260,7 @@ const Sip = {
 
   emCurso() {
     Toque.parar();
+    if (this.info) this.info.atendida = true;
     this.atualizarVideo();
     if (this.inicio) return;
     this.inicio = Date.now();
@@ -229,7 +270,10 @@ const Sip = {
   },
 
   atender(video = false) { Toque.parar(); this.sessao?.answer(this.opcoes(video)); },
-  desligar() { try { this.sessao?.terminate(); } catch { this.fim('Chamada terminada'); } },
+  desligar() {
+    if (this.info?.recebida && !this.info.atendida) this.info.recusei = true;
+    try { this.sessao?.terminate(); } catch { this.fim('Chamada terminada'); }
+  },
 
   alternarSilencio() {
     if (!this.sessao) return false;
@@ -250,6 +294,17 @@ const Sip = {
 
   fim(texto) {
     Toque.parar();
+    const i = this.info;
+    if (i && cfg) {
+      const tipo = !i.recebida ? 'feita' : i.atendida ? 'recebida' : i.recusei ? 'recusada' : 'perdida';
+      Registo.juntar({
+        numero: i.numero, nome: i.nome, tipo, video: i.video, hora: Date.now(),
+        duracao: this.inicio ? Math.round((Date.now() - this.inicio) / 1000) : 0,
+      });
+      if (tipo === 'perdida') Avisos.mostrar('Chamada perdida', i.nome, 'perdida', () => UI.vista('chamadas'));
+      this.info = null;
+      UI.chamadas();
+    }
     clearInterval(this.relogio);
     this.relogio = null;
     this.inicio = null;
@@ -613,10 +668,71 @@ const UI = {
   /** Nome da extensão (o "Display Name" do Issabel), ou o número se não houver. */
   nomeExt(numero) { return Xmpp.contactos.get(Xmpp.jid(numero))?.nome || numero; },
 
+  /** v: 'teclado' | 'chamadas' | 'contactos' | 'conversa' */
   vista(v) {
-    $('.corpo').dataset.vista = v;
+    if (v === 'chamadas') this.lista('chamadas');
+    else if (v === 'contactos') this.lista('conversas');
+    $('.corpo').dataset.vista = v === 'chamadas' ? 'contactos' : v;
     document.querySelectorAll('.separadores button').forEach((b) =>
       b.classList.toggle('ativo', b.dataset.vista === v || (v === 'conversa' && b.dataset.vista === 'contactos')));
+  },
+
+  /** Painel da esquerda: lista de conversas ou registo de chamadas. */
+  lista(qual) {
+    $('.contactos').dataset.lista = qual;
+    document.querySelectorAll('.abas-lista button').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === qual));
+    if (qual === 'chamadas') { Registo.marcarVistas(); this.chamadas(); }
+  },
+
+  chamadas() {
+    if (!cfg) return;
+    const lista = Registo.tudo();
+    const hoje = new Date().toDateString();
+    const ontem = new Date(Date.now() - 864e5).toDateString();
+    const fmtH = new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    const fmtD = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit' });
+    const quando = (h) => {
+      const d = new Date(h).toDateString();
+      return (d === hoje ? 'hoje' : d === ontem ? 'ontem' : fmtD.format(h)) + ' ' + fmtH.format(h);
+    };
+    const dur = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}h ` : '') + `${Math.floor((s % 3600) / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const TIPOS = {
+      feita: ['↗', 'azul', 'Feita'], recebida: ['↙', 'verde', 'Recebida'],
+      perdida: ['↙', 'vermelha', 'Perdida'], recusada: ['↙', 'vermelha', 'Recusada'],
+    };
+    $('#registo').replaceChildren(...lista.map((c) => {
+      const [seta, cor, rotulo] = TIPOS[c.tipo] || TIPOS.feita;
+      const nome = this.nomeExt(c.numero) !== c.numero ? this.nomeExt(c.numero) : (c.nome || c.numero);
+      const li = document.createElement('li');
+      li.className = c.tipo;
+      const b = document.createElement('button');
+      b.className = 'chamada-linha';
+      b.title = 'Ligar';
+      const s1 = document.createElement('span');
+      s1.className = `seta cor-${cor}`;
+      s1.textContent = seta;
+      const info = document.createElement('span');
+      info.className = 'contacto-info';
+      const n = document.createElement('strong');
+      n.textContent = nome;
+      const sub = document.createElement('small');
+      sub.textContent = [rotulo + (c.video ? ' · vídeo' : ''), nome !== c.numero ? c.numero : '', quando(c.hora),
+        c.duracao ? dur(c.duracao) : ''].filter(Boolean).join(' · ');
+      info.append(n, sub);
+      b.append(s1, info);
+      b.onclick = () => Sip.chamar(c.numero, false);
+      const v = document.createElement('button');
+      v.className = 'rapido';
+      v.textContent = '🎥';
+      v.title = 'Videochamada';
+      v.setAttribute('aria-label', `Videochamada para ${nome}`);
+      v.onclick = () => Sip.chamar(c.numero, true);
+      li.append(b, v);
+      return li;
+    }));
+    $('#sem-chamadas').hidden = lista.length > 0;
+    const perdidas = $('.contactos').dataset.lista === 'chamadas' ? 0 : Registo.perdidasPorVer();
+    document.querySelectorAll('.contador.perdidas').forEach((k) => { k.hidden = perdidas === 0; k.textContent = perdidas; });
   },
 
   estado(qual, tipo, texto) {
@@ -944,8 +1060,14 @@ function ligarEventos() {
 
   document.querySelectorAll('.separadores button').forEach((b) => {
     b.onclick = () => UI.vista(b.dataset.vista === 'contactos' && UI.conversaCom && $('.corpo').dataset.vista === 'teclado' ? 'conversa' : b.dataset.vista);
+    if (b.dataset.vista === 'chamadas') b.onclick = () => UI.vista('chamadas');
   });
   $('#btn-voltar').onclick = () => UI.vista('contactos');
+  document.querySelectorAll('.abas-lista button').forEach((b) => { b.onclick = () => UI.lista(b.dataset.lista); });
+  $('#btn-limpar-chamadas').onclick = () => {
+    if (confirm('Apagar o registo de chamadas deste browser?')) { Registo.limpar(); UI.chamadas(); }
+  };
+  $('#btn-tema').onclick = () => Tema.seguinte();
 
   $('#form-contacto').onsubmit = (e) => {
     e.preventDefault();
@@ -1066,6 +1188,8 @@ function entrar(c) {
   UI.porLer.clear();
   UI.fecharConversa();
   UI.vista('teclado');
+  UI.lista('conversas');
+  UI.chamadas();
   UI.botaoNotificacoes();
   Sip.ligar();
   Xmpp.ligar();
@@ -1085,6 +1209,7 @@ function sair() {
 
 montarTeclados();
 ligarEventos();
+Tema.aplicar(Tema.atual());
 const guardada = ler(CHAVE_CONFIG);
 if (guardada?.sessao && !verificarRequisitos()) entrar(completarConfig(guardada));
 else mostrarLogin(guardada);

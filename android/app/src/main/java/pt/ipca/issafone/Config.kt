@@ -46,6 +46,13 @@ object ConfigStore {
 
     /** true depois de entrar; false depois de "Sair". Decide se o serviço arranca no boot. */
     fun sessaoAtiva(ctx: Context) = prefs(ctx).getBoolean("sessaoAtiva", false)
+
+    /** Tema escolhido: AUTO (segue o sistema), CLARO ou ESCURO. */
+    fun tema(ctx: Context) = runCatching {
+        pt.ipca.issafone.ui.ModoTema.valueOf(prefs(ctx).getString("tema", "AUTO")!!)
+    }.getOrDefault(pt.ipca.issafone.ui.ModoTema.AUTO)
+    fun definirTema(ctx: Context, m: pt.ipca.issafone.ui.ModoTema) =
+        prefs(ctx).edit().putString("tema", m.name).apply()
     fun definirSessaoAtiva(ctx: Context, ativa: Boolean) =
         prefs(ctx).edit().putBoolean("sessaoAtiva", ativa).apply()
 }

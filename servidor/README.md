@@ -27,7 +27,7 @@ Só é preciso correr o script uma vez. Podes voltar a corrê-lo sem problema, p
 
 Não é preciso voltar a correr o script:
 
-- **Android/iPhone:** cria a extensão no Issabel e carrega em *Aplicar*. A conta de chat existe logo, com a mesma palavra-passe.
+- **Android/iPhone:** cria a extensão no Issabel e carrega em *Aplicar*. A conta de chat existe logo, com a mesma palavra-passe, e a extensão aparece sozinha nos contactos de toda a gente. O serviço recarrega o Openfire e as apps voltam a ligar-se em segundos.
 - **Web (201–210):** igual. O serviço `issafone-webrtc` deteta a alteração e aplica as opções WebRTC à extensão nova, normalmente em poucos segundos.
 
 Para veres o que o serviço fez: `journalctl -t issafone`.

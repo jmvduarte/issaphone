@@ -38,9 +38,12 @@ class MainActivity : ComponentActivity() {
         mostrarSobreBloqueioDuranteChamadas()
 
         setContent {
-            MaterialTheme {
-                val ligado by vm.ligado.collectAsState()
-                if (ligado) EcraPrincipal(vm) else EcraLogin(vm)
+            val tema by vm.tema.collectAsState()
+            pt.ipca.issafone.ui.IssaFoneTema(tema) {
+                androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background) {
+                    val ligado by vm.ligado.collectAsState()
+                    if (ligado) EcraPrincipal(vm) else EcraLogin(vm)
+                }
             }
         }
     }

@@ -41,6 +41,7 @@ class IssaFoneService : Service() {
         observarEstado()
         observarChamadas()
         observarMensagens()
+        observarPerdidas()
         observarRede()
         procurarAtualizacoes()
     }
@@ -95,6 +96,19 @@ class IssaFoneService : Service() {
             if (!visivel) novas.forEach {
                 val texto = it.autor?.let { a -> "${app.xmpp.nomeExt(a)}: ${it.texto}" } ?: it.texto
                 Notificacoes.mensagem(this@IssaFoneService, it.contacto, app.xmpp.nomeDe(it.contacto), texto)
+            }
+        }
+    }
+
+    /** Avisa das chamadas perdidas quando a app não está visível. */
+    private fun observarPerdidas() = scope.launch {
+        var conhecidas = app.sip.registoChamadas.lista.value.toSet()
+        app.sip.registoChamadas.lista.collect { lista ->
+            val novas = lista.filter { it !in conhecidas && it.tipo == "perdida" }
+            conhecidas = lista.toSet()
+            val visivel = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            if (!visivel) novas.forEach {
+                Notificacoes.chamadaPerdida(this@IssaFoneService, app.xmpp.nomeExt(it.numero).let { n -> if (n != it.numero) n else it.nome })
             }
         }
     }

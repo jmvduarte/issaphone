@@ -245,18 +245,33 @@ novo=$(
   echo "; <<< IssaFone"
 )
 atual=$(sed -n '/^; >>> IssaFone/,/^; <<< IssaFone/p' "$POST" 2>/dev/null)
-[ "$novo" = "$atual" ] && exit 0
-touch "$POST"
-sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$POST"
-printf '%s\n' "$novo" >> "$POST"
-asterisk -rx "sip reload" >/dev/null 2>&1
-logger -t issafone "Opções WebRTC atualizadas"
+if [ "$novo" != "$atual" ]; then
+  touch "$POST"
+  sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$POST"
+  printf '%s\n' "$novo" >> "$POST"
+  asterisk -rx "sip reload" >/dev/null 2>&1
+  logger -t issafone "Opções WebRTC atualizadas"
+fi
+
+# Contactos: o Openfire guarda a lista de extensões em memória e não sabe que o
+# Issabel mudou. Se houver extensões novas/apagadas ou nomes alterados, recarrega-o:
+# as apps voltam a ligar-se sozinhas e recebem a lista nova (com o contacto novo).
+ESTADO=/var/lib/issafone/extensoes
+mkdir -p /var/lib/issafone
+assinatura="$(grep -oE '^\[[0-9]+\]' "$ADD" | sort | tr -d '\n')|$(grep -E '^callerid=' "$ADD" | sort | md5sum | cut -c1-12)"
+if [ "$(cat "$ESTADO" 2>/dev/null)" != "$assinatura" ]; then
+  if [ -f "$ESTADO" ]; then
+    service openfire restart >/dev/null 2>&1
+    logger -t issafone "Extensões alteradas: Openfire recarregado (contactos atualizados)"
+  fi
+  echo "$assinatura" > "$ESTADO"
+fi
 EOF
 chmod +x /usr/local/sbin/issafone-webrtc
 
 cat > /etc/systemd/system/issafone-webrtc.service <<'EOF'
 [Unit]
-Description=IssaFone: opcoes WebRTC nas extensoes web
+Description=IssaFone: opcoes WebRTC e contactos quando as extensoes mudam
 
 [Service]
 Type=oneshot

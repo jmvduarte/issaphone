@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="IssaFone">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="css/app.css">
+  <script>try { const t = localStorage.getItem('issafone.tema'); if (t === 'claro' || t === 'escuro') document.documentElement.dataset.tema = t; } catch (e) {}</script>
 </head>
 <body>
 
@@ -76,12 +77,26 @@
       </span>
     </div>
     <button id="btn-notificacoes" class="discreto" hidden>Ativar notificações</button>
+    <button id="btn-tema" class="discreto" title="Tema">◐ Automático</button>
     <button id="btn-sair" class="discreto">Sair</button>
   </header>
 
   <div class="corpo" data-vista="teclado">
     <!-- Contactos -->
-    <section class="painel contactos" aria-label="Contactos">
+    <section class="painel contactos" aria-label="Contactos" data-lista="conversas">
+      <div class="abas-lista" role="tablist">
+        <button data-lista="conversas" class="ativo" role="tab">Conversas</button>
+        <button data-lista="chamadas" role="tab">Chamadas <span class="contador perdidas" hidden></span></button>
+      </div>
+      <div id="lista-chamadas">
+        <div class="secao">
+          <span>Chamadas recentes</span>
+          <button id="btn-limpar-chamadas" class="discreto pequeno">Limpar</button>
+        </div>
+        <ul id="registo" class="lista"></ul>
+        <p id="sem-chamadas" class="vazio">Ainda não há chamadas.</p>
+      </div>
+      <div id="lista-conversas">
       <form id="form-contacto" class="adicionar">
         <input name="novo" placeholder="Adicionar colega (ex.: 202)" autocapitalize="off" aria-label="Adicionar colega">
         <button type="submit" aria-label="Adicionar">+</button>
@@ -95,6 +110,7 @@
       <div class="secao"><span>Contactos</span></div>
       <ul id="lista-contactos" class="lista"></ul>
       <p id="sem-contactos" class="vazio">Sem contactos. Adiciona colegas acima ou ativa a partilha do grupo IssaFone no Openfire.</p>
+      </div>
     </section>
 
     <!-- Conversa -->
@@ -132,6 +148,7 @@
 
   <nav class="separadores" aria-label="Navegação">
     <button data-vista="teclado" class="ativo">Teclado</button>
+    <button data-vista="chamadas">Chamadas <span class="contador perdidas" hidden></span></button>
     <button data-vista="contactos">Chat <span id="por-ler" class="contador" hidden></span></button>
   </nav>
 
