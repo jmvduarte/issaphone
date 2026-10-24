@@ -29,6 +29,9 @@ import org.jxmpp.jid.EntityBareJid
 import org.jxmpp.jid.Jid
 import org.jxmpp.jid.impl.JidCreate
 import org.jxmpp.jid.parts.Resourcepart
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.net.InetAddress
 import java.text.Normalizer
 
@@ -64,6 +67,8 @@ class XmppManager(context: Context) {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val appCtx = context.applicationContext
+    private var ficheiroHistorico: File? = null
     private var ligacao: XMPPTCPConnection? = null
     private var alcunha = ""
     private val salas = mutableMapOf<String, MultiUserChat>()
@@ -111,6 +116,7 @@ class XmppManager(context: Context) {
             _estado.value = "A ligar…"
             desligarInterno()
             alcunha = utilizador
+            carregarHistorico("$utilizador@$dominio")
 
             val config = XMPPTCPConnectionConfiguration.builder()
                 .setUsernameAndPassword(utilizador, password)
@@ -160,7 +166,8 @@ class XmppManager(context: Context) {
     private fun atualizarContactos() {
         val con = ligacao ?: return
         val roster = Roster.getInstanceFor(con)
-        _contactos.value = roster.entries.map {
+        val eu = con.user?.asBareJid()?.toString()
+        _contactos.value = roster.entries.filter { it.jid.asBareJid().toString() != eu }.map {
             Contacto(
                 jid = it.jid.asBareJid().toString(),
                 nome = it.name ?: it.jid.localpartOrNull?.toString() ?: it.jid.toString(),
@@ -181,6 +188,7 @@ class XmppManager(context: Context) {
             }
             if (repetida) lista else (lista + m).sortedBy { it.hora }
         }
+        gravarHistorico()
     }
 
     /** Aceita "101" (completa com o domínio) ou "101@dominio"; também envia para grupos. */
@@ -387,6 +395,7 @@ class XmppManager(context: Context) {
         salas.remove(jid)
         _grupos.update { lista -> lista.filter { it.jid != jid } }
         _mensagens.update { lista -> lista.filter { it.contacto != jid } }
+        gravarHistorico()
         val con = ligacao
         if (con != null) scope.launch {
             runCatching { BookmarkManager.getBookmarkManager(con).removeBookmarkedConference(JidCreate.entityBareFrom(jid)) }
@@ -400,6 +409,48 @@ class XmppManager(context: Context) {
             BookmarkManager.getBookmarkManager(con).addBookmarkedConference(
                 nome, JidCreate.entityBareFrom(jid) as EntityBareJid, true, Resourcepart.from(alcunha), null
             )
+        }
+    }
+
+    /* ======================= Histórico no telemóvel ======================= */
+
+    /** Lê as conversas guardadas desta conta (cada conta tem o seu ficheiro). */
+    private fun carregarHistorico(conta: String) {
+        val f = File(appCtx.filesDir, "historico-" + conta.replace(Regex("[^A-Za-z0-9@._-]"), "_") + ".json")
+        ficheiroHistorico = f
+        val lista = runCatching {
+            val arr = JSONArray(f.readText())
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Mensagem(
+                    contacto = o.getString("c"), texto = o.getString("t"), enviada = o.getBoolean("e"),
+                    hora = o.getLong("h"), autor = o.optString("a").ifEmpty { null },
+                    historico = true // já vistas: não voltam a notificar
+                )
+            }
+        }.getOrDefault(emptyList())
+        _mensagens.value = lista
+    }
+
+    /** Guarda as últimas 300 mensagens de cada conversa. */
+    private fun gravarHistorico() {
+        val f = ficheiroHistorico ?: return
+        scope.launch {
+            val lista = _mensagens.value   // sempre a versão mais recente
+            val arr = JSONArray()
+            lista.groupBy { it.contacto }.values.flatMap { it.takeLast(300) }.sortedBy { it.hora }.forEach { m ->
+                arr.put(JSONObject().apply {
+                    put("c", m.contacto); put("t", m.texto); put("e", m.enviada); put("h", m.hora)
+                    m.autor?.let { put("a", it) }
+                })
+            }
+            synchronized(this@XmppManager) {
+                runCatching {
+                    val tmp = File(f.path + ".tmp")
+                    tmp.writeText(arr.toString())
+                    tmp.renameTo(f)
+                }
+            }
         }
     }
 

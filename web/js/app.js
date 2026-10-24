@@ -330,6 +330,7 @@ const Xmpp = {
   lerRoster(iq) {
     iq.querySelectorAll('item').forEach((it) => {
       const jid = it.getAttribute('jid');
+      if (jid === this.eu) return; // a própria extensão não aparece nos contactos
       if (it.getAttribute('subscription') === 'remove') { this.contactos.delete(jid); return; }
       const antes = this.contactos.get(jid);
       this.contactos.set(jid, { jid, nome: it.getAttribute('name') || jid.split('@')[0], online: antes?.online || false });
