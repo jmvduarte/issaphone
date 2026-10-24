@@ -12,6 +12,11 @@ packages:
   XMPPFramework:
     url: https://github.com/robbiehanson/XMPPFramework.git
     branch: master
+  # O XMPPFramework declara iOS 12; o CocoaLumberjack 3.9+ exige iOS 15 e
+  # parte a compilação. Fixar a 3.8.x obriga o SPM a escolher essa versão.
+  CocoaLumberjack:
+    url: https://github.com/CocoaLumberjack/CocoaLumberjack.git
+    exactVersion: 3.8.5
 
 targets:
   # Interface Swift da Linphone num módulo próprio, para "import linphonesw"
@@ -49,6 +54,8 @@ targets:
     dependencies:
       - target: linphonesw
       - package: XMPPFramework
+      - package: CocoaLumberjack
+        product: CocoaLumberjack
       - framework: LinphoneSDK/XCFrameworks/bctoolbox.xcframework
       - framework: LinphoneSDK/XCFrameworks/bctoolbox-ios.xcframework
       - framework: LinphoneSDK/XCFrameworks/belcard.xcframework
