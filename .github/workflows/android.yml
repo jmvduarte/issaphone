@@ -37,7 +37,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Compilar APK de debug
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          FALHOU=0
+          ./gradlew assembleDebug > gradle.log 2>&1 || FALHOU=1
+          # Erros de compilação como anotações (visíveis no resumo da execução)
+          grep -E "^e: |error:|What went wrong" -A2 gradle.log | grep -vE "^--$" \
+            | awk 'length > 0 && !visto[$0]++' | head -40 \
+            | while IFS= read -r l; do echo "::error::${l//%/%25}"; done
+          tail -20 gradle.log
+          exit $FALHOU
 
       - name: Preparar keystore (se configurada)
         id: keystore

@@ -119,7 +119,19 @@ O site [dontkillmyapp.com](https://dontkillmyapp.com) tem instruções para cada
 
 O serviço usa o tipo `specialUse`, adequado a uma app instalada por APK. Para publicar na Play Store, a Google exige justificar este tipo; nesse caso o caminho seria o push.
 
-## 6. Limitações conhecidas (para mencionar no relatório)
+## 6. Atualizações automáticas
+
+Cada build do GitHub publica uma Release `android-N`. A app procura versões novas ao abrir e de 6 em 6 horas, através do serviço em segundo plano; nunca o faz durante uma chamada. Quando encontra uma, descarrega o APK e instala-o com o `PackageInstaller` do Android.
+
+- **Na primeira atualização**, o Android pede para autorizar o IssaFone a "instalar apps desconhecidas" e para confirmar.
+- **Depois disso**, no Android 12 ou superior, a app atualiza-se sozinha, sem perguntar.
+- Com a app fechada, se for preciso confirmar, aparece uma notificação "Nova versão do IssaFone".
+
+Para isto funcionar, todos os APK têm de estar assinados com a mesma chave. Por isso, a chave de debug (`app/issafone-debug.jks`, palavra-passe `android`) está no repositório. Não é segura para publicar na Play Store, mas para testes é o padrão do Android. A versão (`versionCode`) é o número do build no GitHub Actions.
+
+O código está em `atualizacao/Atualizador.kt`.
+
+## 7. Limitações conhecidas (para mencionar no relatório)
 
 - Não usa notificações push: a ligação permanente gasta mais bateria do que uma solução com FCM (ver secção 5).
 - As mensagens ficam só em memória. O histórico perde-se ao fechar a app (solução: Room/SQLite ou XEP-0313 MAM no Openfire).

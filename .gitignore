@@ -5,6 +5,9 @@ android/app/build/
 android/local.properties
 android/out/
 *.jks
+# Exceção: chave de debug partilhada (não é secreta; só serve para as atualizações
+# automáticas funcionarem entre builds do GitHub). Nunca usar para publicar.
+!android/app/issafone-debug.jks
 *.keystore
 
 # iOS

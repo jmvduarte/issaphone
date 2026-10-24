@@ -28,6 +28,7 @@ fun EcraPrincipal(vm: AppViewModel) {
     val chamada by vm.sip.chamada.collectAsState()
     val registo by vm.sip.registo.collectAsState()
     val estadoChat by vm.xmpp.estado.collectAsState()
+    val atualizacao by vm.estadoAtualizacao.collectAsState()
 
     // Tocar numa notificação de mensagem abre logo essa conversa
     val pedido by vm.abrirConversa.collectAsState()
@@ -44,6 +45,9 @@ fun EcraPrincipal(vm: AppViewModel) {
                 }
                 Text("Telefone: $registo", style = MaterialTheme.typography.bodySmall)
                 Text("Chat: $estadoChat", style = MaterialTheme.typography.bodySmall)
+                atualizacao?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
             }
         },
         bottomBar = {

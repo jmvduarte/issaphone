@@ -12,14 +12,33 @@ android {
         applicationId = "pt.ipca.issafone"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // No GitHub Actions, cada build tem um número maior que o anterior:
+        // é isso que permite à app saber que existe uma versão nova.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "1.0.$build"
+
+        // Repositório onde a app procura atualizações (Releases "android-N")
+        buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issaphone\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
+        compose = true
     }
 
     // Assinatura de release: só é usada se as variáveis existirem
     // (no GitHub vêm dos Secrets; localmente o Android Studio usa a chave de debug).
     val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     signingConfigs {
+        // Chave de debug fixa, guardada no repositório: todos os APK de teste ficam
+        // com a mesma assinatura, condição para o Android aceitar atualizações.
+        getByName("debug") {
+            storeFile = file("issafone-debug.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (keystorePath != null) {
             create("release") {
                 storeFile = file(keystorePath)
@@ -43,7 +62,6 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
 
     packaging {
         resources {

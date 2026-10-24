@@ -12,6 +12,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import pt.ipca.issafone.AppViewModel
+import pt.ipca.issafone.BuildConfig
 import pt.ipca.issafone.Config
 
 @Composable
@@ -32,7 +33,8 @@ fun EcraLogin(vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("IssaFone", style = MaterialTheme.typography.headlineMedium)
-        Text("Chamadas e chat interno do Issabel", style = MaterialTheme.typography.bodyMedium)
+        Text("Chamadas e chat interno do Issabel · versão ${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.bodyMedium)
 
         Text("Servidor", style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(servidor, { servidor = it.trim() }, label = { Text("IP do Issabel") },

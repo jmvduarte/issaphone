@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import pt.ipca.issafone.atualizacao.Atualizador
 import pt.ipca.issafone.servico.IssaFoneService
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -25,7 +26,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Reabrir a app com sessão ativa: garante que o serviço está a correr
         if (_ligado.value) iniciarServico()
+        // Ao abrir a app, procura logo uma versão nova
+        viewModelScope.launch {
+            val c = sip.chamada.value
+            if (!c.ativa && !c.aTocar) Atualizador.verificarEInstalar(getApplication())
+        }
     }
+
+    val estadoAtualizacao = Atualizador.estado
 
     fun entrar(c: Config) {
         ConfigStore.guardar(getApplication(), c)

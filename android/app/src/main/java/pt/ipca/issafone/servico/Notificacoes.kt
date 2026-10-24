@@ -20,9 +20,11 @@ object Notificacoes {
     const val CANAL_SERVICO = "servico"
     const val CANAL_CHAMADAS = "chamadas"
     const val CANAL_MENSAGENS = "mensagens"
+    const val CANAL_ATUALIZACOES = "atualizacoes"
 
     const val ID_SERVICO = 1
     const val ID_CHAMADA = 2
+    const val ID_ATUALIZACAO = 3
     private const val ID_MENSAGEM_BASE = 1000
 
     const val ACAO_ATENDER = "pt.ipca.issafone.ATENDER"
@@ -45,6 +47,9 @@ object Notificacoes {
             },
             NotificationChannel(CANAL_MENSAGENS, "Mensagens", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Mensagens do chat interno"
+            },
+            NotificationChannel(CANAL_ATUALIZACOES, "Atualizações", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Novas versões do IssaFone"
             }
         ))
     }
@@ -110,6 +115,21 @@ object Notificacoes {
             .setAutoCancel(true)
             .build()
         notificar(ctx, ID_MENSAGEM_BASE + (de.hashCode() and 0xFFFF), n)
+    }
+
+    /** Atualização descarregada que precisa de um toque para ser instalada. */
+    fun atualizacaoPronta(ctx: Context, versao: String, confirmar: Intent) {
+        val pi = PendingIntent.getActivity(
+            ctx, 40, confirmar, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val n = NotificationCompat.Builder(ctx, CANAL_ATUALIZACOES)
+            .setSmallIcon(R.drawable.ic_stat_issafone)
+            .setContentTitle("Nova versão do IssaFone")
+            .setContentText("Toca para instalar a versão $versao")
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        notificar(ctx, ID_ATUALIZACAO, n)
     }
 
     private fun notificar(ctx: Context, id: Int, n: Notification) {

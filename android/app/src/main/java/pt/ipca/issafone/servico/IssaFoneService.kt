@@ -15,10 +15,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import pt.ipca.issafone.ConfigStore
 import pt.ipca.issafone.IssaFoneApp
+import pt.ipca.issafone.atualizacao.Atualizador
 
 /**
  * Serviço em primeiro plano: mantém o processo vivo com a app fechada, para
@@ -39,6 +42,7 @@ class IssaFoneService : Service() {
         observarChamadas()
         observarMensagens()
         observarRede()
+        procurarAtualizacoes()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -84,6 +88,16 @@ class IssaFoneService : Service() {
             vistas = lista.size
             val visivel = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             if (!visivel) novas.forEach { Notificacoes.mensagem(this@IssaFoneService, it.contacto, it.texto) }
+        }
+    }
+
+    /** De 6 em 6 horas procura uma versão nova (nunca durante uma chamada). */
+    private fun procurarAtualizacoes() = scope.launch {
+        delay(60_000) // deixa o registo SIP estabilizar primeiro
+        while (isActive) {
+            val c = app.sip.chamada.value
+            if (!c.ativa && !c.aTocar) Atualizador.verificarEInstalar(this@IssaFoneService)
+            delay(6 * 60 * 60 * 1000L)
         }
     }
 
