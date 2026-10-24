@@ -100,7 +100,7 @@ final class XmppManager: NSObject, ObservableObject {
         contactos = users.map {
             Contacto(jid: $0.jid.bare,
                      nome: $0.nickname ?? $0.jid.user ?? $0.jid.bare,
-                     online: $0.isOnline())
+                     online: $0.isOnline)
         }
         .sorted { ($0.online ? 0 : 1, $0.nome) < ($1.online ? 0 : 1, $1.nome) }
     }
