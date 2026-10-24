@@ -1,0 +1,68 @@
+# IssaFone
+
+Softphone com chat interno para o **Issabel 4**, com versões **Android** e **iOS**.
+- Chamadas de voz por **SIP** (Asterisk) com o Linphone SDK
+- Chat interno por **XMPP** (Openfire)
+
+Projeto académico — CTESP Redes e Sistemas Informáticos, IPCA.
+
+| Pasta | Plataforma | Tecnologia | Build automático |
+|-------|------------|------------|------------------|
+| [`android/`](android/README.md) | Android 8+ | Kotlin, Jetpack Compose, Linphone, Smack | `.apk` (GitHub Actions, Linux) |
+| [`ios/`](ios/README.md) | iOS 16+ | Swift, SwiftUI, Linphone, XMPPFramework | `.ipa` sem assinatura (GitHub Actions, macOS) |
+
+A configuração do servidor Issabel (extensões, Openfire, firewall) está em [`android/README.md`](android/README.md).
+
+## Enviar para o GitHub
+
+1. Em github.com, cria um repositório **vazio** chamado `IssaFone`, sem README nem .gitignore. Torna-o **público** se quiseres os minutos de macOS grátis.
+2. Nesta pasta:
+
+```bash
+git remote add origin https://github.com/O_TEU_UTILIZADOR/IssaFone.git
+git push -u origin main
+```
+
+O repositório já vem inicializado com o primeiro commit. Se a pasta `.git` não vier (por exemplo, ao extrair no Windows), faz primeiro:
+
+```bash
+git init -b main
+git add .
+git commit -m "IssaFone: versões Android e iOS"
+```
+
+3. Abre o separador **Actions**: os dois builds arrancam sozinhos. Depois, cada `push` que mexa em `android/` ou `ios/` volta a compilar só essa plataforma. Também podes correr qualquer um à mão em *Run workflow*.
+
+## Obter as apps
+
+**Android**
+- Em *Actions → Android build →* última execução, descarrega o artefacto **IssaFone-apk** e instala o `IssaFone-debug.apk` no telemóvel. É preciso autorizar "instalar apps de origem desconhecida".
+- Para uma versão "oficial" com link fixo, cria uma tag e o APK fica publicado em *Releases*:
+  ```bash
+  git tag v1.0 && git push origin v1.0
+  ```
+
+**iOS**
+- Em *Actions → iOS build*, descarrega **IssaFone-ipa** e instala-o com o Sideloadly. Os passos estão em [`ios/README.md`](ios/README.md).
+
+## (Opcional) APK de release assinado
+
+O APK de debug é assinado com uma chave temporária que muda em cada build. Na prática, isto obriga a desinstalar a versão anterior antes de instalar a nova. Para teres sempre a mesma assinatura:
+
+1. Cria uma keystore (uma vez só e **guarda-a bem**, porque sem ela não consegues atualizar a app):
+   ```bash
+   keytool -genkeypair -v -keystore issafone.jks -alias issafone -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Converte-a para texto:
+   - Linux/macOS: `base64 -w0 issafone.jks > issafone.txt`
+   - Windows (PowerShell): `[Convert]::ToBase64String([IO.File]::ReadAllBytes("issafone.jks")) > issafone.txt`
+3. No GitHub, vai a *Settings → Secrets and variables → Actions → New repository secret* e cria:
+
+| Secret | Valor |
+|--------|-------|
+| `ANDROID_KEYSTORE_BASE64` | conteúdo do `issafone.txt` |
+| `ANDROID_KEYSTORE_PASSWORD` | password da keystore |
+| `ANDROID_KEY_ALIAS` | `issafone` |
+| `ANDROID_KEY_PASSWORD` | password da chave |
+
+A partir daí, cada build gera também o `IssaFone.apk` assinado. **Nunca faças commit da `.jks`**; o `.gitignore` já a exclui.

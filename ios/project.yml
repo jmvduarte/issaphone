@@ -1,0 +1,41 @@
+# Gera o IssaFone.xcodeproj com XcodeGen:
+#   brew install xcodegen
+#   xcodegen
+name: IssaFone
+options:
+  bundleIdPrefix: pt.ipca
+  deploymentTarget:
+    iOS: "16.0"
+
+packages:
+  linphonesw:
+    url: https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git
+    from: 5.3.0
+  XMPPFramework:
+    url: https://github.com/robbiehanson/XMPPFramework.git
+    branch: master
+
+targets:
+  IssaFone:
+    type: application
+    platform: iOS
+    sources: [IssaFone]
+    scheme: {}   # esquema partilhado, necessário para compilar no GitHub Actions
+    dependencies:
+      - package: linphonesw
+      - package: XMPPFramework
+    info:
+      path: IssaFone/Info.plist
+      properties:
+        CFBundleDisplayName: IssaFone
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSMicrophoneUsageDescription: "O IssaFone precisa do microfone para as chamadas."
+        NSLocalNetworkUsageDescription: "O IssaFone liga-se ao servidor Issabel na rede local."
+        UIBackgroundModes: [audio, voip]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pt.ipca.issafone
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_BITCODE: NO
