@@ -18,7 +18,8 @@ data class CallUi(
     val aTocar: Boolean = false,        // chamada recebida à espera de resposta
     val ativa: Boolean = false,
     val ofereceVideo: Boolean = false,  // a chamada recebida traz vídeo
-    val comVideo: Boolean = false       // a chamada em curso tem vídeo
+    val comVideo: Boolean = false,      // a chamada em curso tem vídeo
+    val nome: String = ""               // nome enviado pelo Issabel (Display Name), se houver
 )
 
 /**
@@ -57,7 +58,8 @@ class SipManager(context: Context) {
         override fun onCallStateChanged(core: Core, call: Call, state: Call.State, message: String) {
             val remoto = call.remoteAddress.username ?: call.remoteAddress.asStringUriOnly()
             val video = call.currentParams.isVideoEnabled
-            _chamada.value = when (state) {
+            val nome = call.remoteAddress.displayName?.takeIf { it.isNotBlank() && it != remoto } ?: ""
+            val novo = when (state) {
                 Call.State.IncomingReceived -> {
                     val oferece = call.remoteParams?.isVideoEnabled == true
                     CallUi(if (oferece) "Videochamada a chegar" else "A receber chamada", remoto,
@@ -76,6 +78,7 @@ class SipManager(context: Context) {
                 Call.State.Released -> CallUi().also { _camaraLigada.value = true }
                 else -> _chamada.value
             }
+            _chamada.value = if (novo.remoto.isNotEmpty() && novo.nome.isEmpty()) novo.copy(nome = nome) else novo
         }
     }
 

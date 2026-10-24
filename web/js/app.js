@@ -173,7 +173,7 @@ const Sip = {
     const recebida = originator === 'remote';
     const ofereceVideo = recebida && /\bm=video\s+[1-9]/.test(request?.body || '');
     const numero = s.remote_identity.uri.user || '';
-    const nome = s.remote_identity.display_name || numero;
+    const nome = s.remote_identity.display_name || UI.nomeExt(numero);
 
     let ligado = false;
     const ligarMedia = (pc) => {
@@ -405,7 +405,7 @@ const Xmpp = {
 
   adicionar(utilizador) {
     const jid = this.jid(utilizador.trim());
-    this.con.sendIQ($iq({ type: 'set' }).c('query', { xmlns: NS.ROSTER }).c('item', { jid, name: jid.split('@')[0] }));
+    this.con.sendIQ($iq({ type: 'set' }).c('query', { xmlns: NS.ROSTER }).c('item', { jid }));
     this.con.send($pres({ to: jid, type: 'subscribe' }));
   },
 
@@ -595,8 +595,13 @@ const UI = {
   conversaCom: null,
   porLer: new Map(),
 
-  iniciais(nome) { return (nome || '?').replace(/@.*/, '').slice(0, 2).toUpperCase(); },
+  iniciais(nome) {
+    const p = (nome || '?').replace(/@.*/, '').trim().split(/\s+/);
+    return (p.length > 1 && /\D/.test(p[0]) ? p[0][0] + p.at(-1)[0] : p[0].slice(0, 2)).toUpperCase();
+  },
   nomeDe(jid) { return Xmpp.grupos.get(jid)?.nome || Xmpp.contactos.get(jid)?.nome || jid.split('@')[0]; },
+  /** Nome da extensão (o "Display Name" do Issabel), ou o número se não houver. */
+  nomeExt(numero) { return Xmpp.contactos.get(Xmpp.jid(numero))?.nome || numero; },
 
   vista(v) {
     $('.corpo').dataset.vista = v;
@@ -652,7 +657,7 @@ const UI = {
   ultima(jid) {
     const u = Historico.de(jid).at(-1);
     if (!u) return null;
-    return (u.minha ? 'Tu: ' : u.autor ? `${u.autor}: ` : '') + u.texto;
+    return (u.minha ? 'Tu: ' : u.autor ? `${this.nomeExt(u.autor)}: ` : '') + u.texto;
   },
 
   contactos() {
@@ -664,13 +669,20 @@ const UI = {
     $('#sem-grupos').hidden = grupos.length > 0;
 
     const lista = [...Xmpp.contactos.values()].sort((a, b) => (b.online - a.online) || a.nome.localeCompare(b.nome, 'pt'));
-    $('#lista-contactos').replaceChildren(...lista.map((c) => this.linha({
-      jid: c.jid, nome: c.nome, online: c.online,
-      sub: this.ultima(c.jid) || (c.online ? 'Disponível' : 'Ausente'),
-    })));
+    $('#lista-contactos').replaceChildren(...lista.map((c) => {
+      const num = c.jid.split('@')[0];
+      const estado = this.ultima(c.jid) || (c.online ? 'Disponível' : 'Ausente');
+      return this.linha({ jid: c.jid, nome: c.nome, online: c.online, sub: c.nome !== num ? `${num} · ${estado}` : estado });
+    }));
     $('#sem-contactos').hidden = lista.length > 0;
     this.contadorTotal();
-    if (this.conversaCom) $('#conversa-nome').textContent = this.nomeDe(this.conversaCom);
+    if (this.conversaCom) $('#conversa-nome').textContent = this.tituloConversa(this.conversaCom);
+  },
+
+  tituloConversa(jid) {
+    const nome = this.nomeDe(jid);
+    const num = jid.split('@')[0];
+    return Xmpp.ehGrupo(jid) || nome === num ? nome : `${nome} (${num})`;
   },
 
   contadorTotal() {
@@ -685,7 +697,7 @@ const UI = {
     this.conversaCom = jid;
     this.porLer.delete(jid);
     const grupo = Xmpp.ehGrupo(jid);
-    $('#conversa-nome').textContent = this.nomeDe(jid);
+    $('#conversa-nome').textContent = this.tituloConversa(jid);
     $('#btn-ligar-contacto').hidden = grupo;
     $('#btn-video-contacto').hidden = grupo;
     $('#btn-membros').hidden = !grupo;
@@ -716,7 +728,7 @@ const UI = {
       if (m.autor && !m.minha) {
         const a = document.createElement('span');
         a.className = 'autor';
-        a.textContent = m.autor;
+        a.textContent = this.nomeExt(m.autor);
         li.append(a);
       }
       li.append(document.createTextNode(m.texto));
@@ -736,7 +748,7 @@ const UI = {
     this.contactos();
     if (!semAviso) {
       const titulo = this.nomeDe(de);
-      Avisos.mostrar(titulo, autor ? `${autor}: ${texto}` : texto, 'msg-' + de, () => this.abrirConversa(de));
+      Avisos.mostrar(titulo, autor ? `${this.nomeExt(autor)}: ${texto}` : texto, 'msg-' + de, () => this.abrirConversa(de));
     }
   },
 

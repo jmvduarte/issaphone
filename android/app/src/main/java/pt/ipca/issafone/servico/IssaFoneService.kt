@@ -75,7 +75,9 @@ class IssaFoneService : Service() {
 
     private fun observarChamadas() = scope.launch {
         app.sip.chamada.collect { c ->
-            if (c.aTocar) Notificacoes.chamadaRecebida(this@IssaFoneService, c.remoto, c.ofereceVideo)
+            if (c.aTocar) Notificacoes.chamadaRecebida(
+                this@IssaFoneService, c.nome.ifBlank { app.xmpp.nomeExt(c.remoto) }, c.ofereceVideo
+            )
             else Notificacoes.cancelarChamada(this@IssaFoneService)
         }
     }
@@ -91,7 +93,7 @@ class IssaFoneService : Service() {
             vistas = lista.toSet()
             val visivel = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             if (!visivel) novas.forEach {
-                val texto = it.autor?.let { a -> "$a: ${it.texto}" } ?: it.texto
+                val texto = it.autor?.let { a -> "${app.xmpp.nomeExt(a)}: ${it.texto}" } ?: it.texto
                 Notificacoes.mensagem(this@IssaFoneService, it.contacto, app.xmpp.nomeDe(it.contacto), texto)
             }
         }

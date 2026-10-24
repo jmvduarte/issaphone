@@ -303,7 +303,9 @@ if [ -z "$MYSQL_ROOT" ]; then
   falha "Não encontrei a palavra-passe do MySQL em /etc/issabel.conf"
 else
   mysql -uroot -p"$MYSQL_ROOT" -e "GRANT SELECT ON asterisk.sip TO 'openfire'@'localhost' IDENTIFIED BY '$OF_DB_PASS';
-    GRANT SELECT ON asterisk.sip TO 'openfire'@'127.0.0.1' IDENTIFIED BY '$OF_DB_PASS'; FLUSH PRIVILEGES;" 2>/dev/null \
+    GRANT SELECT ON asterisk.sip TO 'openfire'@'127.0.0.1' IDENTIFIED BY '$OF_DB_PASS';
+    GRANT SELECT ON asterisk.users TO 'openfire'@'localhost';
+    GRANT SELECT ON asterisk.users TO 'openfire'@'127.0.0.1'; FLUSH PRIVILEGES;" 2>/dev/null \
     && ok "Utilizador 'openfire' (só leitura) na base de dados do Issabel" || falha "Não foi possível criar o utilizador MySQL"
   N=$(mysql -uopenfire -p"$OF_DB_PASS" -h127.0.0.1 -N -e "SELECT COUNT(*) FROM asterisk.sip WHERE keyword='secret'" 2>/dev/null)
   [ -n "$N" ] && ok "$N extensões SIP encontradas (serão contas de chat)" || falha "Não consegui ler as extensões (asterisk.sip)"
@@ -339,7 +341,7 @@ bloco = """
     <passwordType>plain</passwordType>
   </jdbcAuthProvider>
   <jdbcUserProvider>
-    <loadUserSQL>SELECT data, NULL FROM sip WHERE id=? AND keyword='callerid'</loadUserSQL>
+    <loadUserSQL>SELECT COALESCE(NULLIF(name, ''), extension), NULL FROM users WHERE extension=?</loadUserSQL>
     <userCountSQL>SELECT COUNT(*) FROM sip WHERE keyword='secret'</userCountSQL>
     <allUsersSQL>SELECT id FROM sip WHERE keyword='secret' ORDER BY id</allUsersSQL>
     <searchSQL>SELECT id FROM sip WHERE keyword='secret' AND</searchSQL>
@@ -374,6 +376,13 @@ sleep 3
 # O assistente do Openfire guarda o fornecedor de autenticação na base de dados,
 # que tem prioridade sobre o openfire.xml: nesse caso é preciso mudá-lo no painel.
 # Só as linhas escritas depois deste reinício (os avisos antigos não contam)
+# O nome das contas vem do "Display Name" das extensões; se a consulta antiga já
+# estiver na base de dados do Openfire, também tem de ser mudada no painel.
+if tail -n +"$((LINHAS_ANTES + 1))" "$LOG_OF" | grep -q "XML Property 'jdbcUserProvider\.loadUserSQL' differs"; then
+  falha "Para os contactos aparecerem com o nome da extensão, no painel do Openfire (Propriedades do Sistema) muda:"
+  echo "      jdbcUserProvider.loadUserSQL = SELECT COALESCE(NULLIF(name, ''), extension), NULL FROM users WHERE extension=?"
+  echo "      e depois: service openfire restart"
+fi
 if tail -n +"$((LINHAS_ANTES + 1))" "$LOG_OF" | grep -q "XML Property 'provider\.\(auth\|user\|group\)\.className' differs"; then
   falha "O Openfire ainda usa os fornecedores da base de dados. No painel (porta 9090), Servidor → Gestão do Servidor → Propriedades do Sistema, muda:"
   echo "      provider.auth.className  = org.jivesoftware.openfire.auth.HybridAuthProvider"

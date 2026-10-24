@@ -39,6 +39,12 @@ private val Verde = Color(0xFF2E7D32)
 private val Vermelho = Color(0xFFC62828)
 private val Azul = Color(0xFF2F5BFF)
 
+private fun iniciais(nome: String): String {
+    val p = nome.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    if (p.isEmpty()) return "?"
+    return (if (p.size > 1 && p[0].any { !it.isDigit() }) "${p[0][0]}${p.last()[0]}" else p[0].take(2)).uppercase()
+}
+
 @Composable
 fun EcraPrincipal(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
@@ -152,6 +158,8 @@ private fun Teclado(onChamar: (String, Boolean) -> Unit) {
 
 @Composable
 private fun PainelChamada(vm: AppViewModel, c: CallUi) {
+    val contactos by vm.xmpp.contactos.collectAsState()
+    val nome = c.nome.ifBlank { contactos.firstOrNull { it.jid.substringBefore("@") == c.remoto }?.nome ?: c.remoto }
     var mute by remember { mutableStateOf(false) }
     var teclas by remember { mutableStateOf(false) }
     val camaraLigada by vm.sip.camaraLigada.collectAsState()
@@ -189,10 +197,11 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
                 Box(
                     Modifier.size(96.dp).clip(CircleShape).background(Azul),
                     contentAlignment = Alignment.Center
-                ) { Text(c.remoto.take(2), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold) }
+                ) { Text(iniciais(nome), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(12.dp))
             }
-            Text(c.remoto, color = Color.White, fontSize = if (c.comVideo) 20.sp else 32.sp)
+            Text(nome, color = Color.White, fontSize = if (c.comVideo) 20.sp else 30.sp, textAlign = TextAlign.Center)
+            if (nome != c.remoto && !c.comVideo) Text(c.remoto, color = Color.LightGray)
             Text(
                 if (c.estado == "Em chamada") "%02d:%02d".format(segundos / 60, segundos % 60) else c.estado,
                 color = Color.LightGray, modifier = Modifier.padding(6.dp)
@@ -265,7 +274,7 @@ private fun ListaChat(vm: AppViewModel, onAbrir: (String) -> Unit) {
     var criar by remember { mutableStateOf(false) }
 
     fun ultima(jid: String) = mensagens.lastOrNull { it.contacto == jid }?.let {
-        (if (it.enviada) "Tu: " else it.autor?.let { a -> "$a: " } ?: "") + it.texto
+        (if (it.enviada) "Tu: " else it.autor?.let { a -> "${vm.xmpp.nomeExt(a)}: " } ?: "") + it.texto
     }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
@@ -298,7 +307,9 @@ private fun ListaChat(vm: AppViewModel, onAbrir: (String) -> Unit) {
                 textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp), color = Color.Gray)
         }
         items(contactos, key = { it.jid }) { c ->
-            Linha(c.nome, ultima(c.jid) ?: if (c.online) "Disponível" else "Ausente", online = c.online) { onAbrir(c.jid) }
+            val num = c.jid.substringBefore("@")
+            val estado = ultima(c.jid) ?: if (c.online) "Disponível" else "Ausente"
+            Linha(c.nome, if (c.nome != num) "$num · $estado" else estado, online = c.online) { onAbrir(c.jid) }
         }
     }
 
@@ -318,7 +329,7 @@ private fun Linha(nome: String, sub: String, grupo: Boolean = false, online: Boo
             Box(
                 Modifier.matchParentSize().clip(if (grupo) RoundedCornerShape(12.dp) else CircleShape).background(Azul),
                 contentAlignment = Alignment.Center
-            ) { Text(if (grupo) "#" else nome.take(2).uppercase(), color = Color.White, fontWeight = FontWeight.Bold) }
+            ) { Text(if (grupo) "#" else iniciais(nome), color = Color.White, fontWeight = FontWeight.Bold) }
             if (!grupo) Box(
                 Modifier.align(Alignment.BottomEnd).size(12.dp).clip(CircleShape)
                     .background(if (online) Color(0xFF43A047) else Color.Gray)
@@ -400,7 +411,8 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onVoltar) { Text("‹") }
-            Text(vm.xmpp.nomeDe(jid), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            val titulo = vm.xmpp.nomeDe(jid).let { n -> if (ehGrupo || n == jid.substringBefore("@")) n else "$n (${jid.substringBefore("@")})" }
+            Text(titulo, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             if (ehGrupo) {
                 TextButton(onClick = { verMembros = true }) { Text("Membros") }
             } else {
@@ -421,7 +433,7 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
                     ) {
                         val cor = if (m.enviada) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                         if (m.autor != null && !m.enviada) {
-                            Text(m.autor, color = Azul, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(vm.xmpp.nomeExt(m.autor), color = Azul, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                         Text(m.texto, color = cor)
                         Text(hora.format(Date(m.hora)), color = cor.copy(alpha = .7f), fontSize = 11.sp)

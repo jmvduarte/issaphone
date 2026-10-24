@@ -86,6 +86,10 @@ class XmppManager(context: Context) {
     fun limparAviso() { _aviso.value = null }
 
     fun ehGrupo(jid: String) = jid.contains("@conference.")
+
+    /** Nome da extensão (o "Display Name" do Issabel, que o Openfire envia), ou o número. */
+    fun nomeExt(numero: String) =
+        _contactos.value.firstOrNull { it.jid.substringBefore("@") == numero }?.nome ?: numero
     fun nomeDe(jid: String) = _grupos.value.firstOrNull { it.jid == jid }?.nome
         ?: _contactos.value.firstOrNull { it.jid == jid }?.nome
         ?: jid.substringBefore("@")
@@ -203,7 +207,8 @@ class XmppManager(context: Context) {
         val jidTexto = if ("@" in utilizador) utilizador else "$utilizador@${con.xmppServiceDomain}"
         try {
             Roster.getInstanceFor(con).createItemAndRequestSubscription(
-                JidCreate.entityBareFrom(jidTexto), utilizador.substringBefore("@"), null
+                // Sem nome: o Openfire preenche com o nome da extensão
+                JidCreate.entityBareFrom(jidTexto), null, null
             )
         } catch (e: Exception) {
             _aviso.value = "Erro ao adicionar: ${e.message}"
