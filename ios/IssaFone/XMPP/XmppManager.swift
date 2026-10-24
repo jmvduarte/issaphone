@@ -82,7 +82,7 @@ final class XmppManager: NSObject, ObservableObject {
         guard !corpo.isEmpty else { return }
         let jidTexto = destino.contains("@") ? destino : "\(destino)@\(dominio)"
         guard let jid = XMPPJID(string: jidTexto) else { return }
-        let msg = XMPPMessage(messageType: .chat, to: jid)
+        let msg = XMPPMessage(type: "chat", to: jid)
         msg.addBody(corpo)
         stream.send(msg)
         mensagens.append(Mensagem(contacto: jidTexto, texto: corpo, enviada: true))
@@ -98,8 +98,8 @@ final class XmppManager: NSObject, ObservableObject {
     private func atualizarContactos() {
         let users = (rosterStorage.unsortedUsers() as? [XMPPUserMemoryStorageObject]) ?? []
         contactos = users.map {
-            Contacto(jid: $0.jid().bare,
-                     nome: $0.nickname ?? $0.jid().user ?? $0.jid().bare,
+            Contacto(jid: $0.jid.bare,
+                     nome: $0.nickname ?? $0.jid.user ?? $0.jid.bare,
                      online: $0.isOnline())
         }
         .sorted { ($0.online ? 0 : 1, $0.nome) < ($1.online ? 0 : 1, $1.nome) }
