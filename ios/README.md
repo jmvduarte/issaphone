@@ -18,20 +18,22 @@ Usa a mesma configuração de servidor da versão Android: extensões SIP, Openf
 O projeto é descrito em `project.yml` e gerado com o XcodeGen. Assim evita-se o ficheiro `.xcodeproj`, que é ilegível e difícil de versionar.
 
 ```bash
-brew install xcodegen
 cd ios
+./scripts/obter-linphone.sh   # descarrega o SDK Linphone (~150 MB) para ios/LinphoneSDK
+brew install xcodegen
 xcodegen
 open IssaFone.xcodeproj
 ```
 
-O Xcode descarrega sozinho os dois pacotes Swift (Linphone e XMPPFramework). A primeira vez demora, porque o Linphone SDK tem várias centenas de MB.
+O SDK Linphone vem em zip do `download.linphone.org`, e não do pacote Swift do `gitlab.linphone.org`, porque este último recusa ligações dos servidores do GitHub Actions. O script também deixa a interface Swift da Linphone pronta como o módulo `linphonesw`. O XMPPFramework é descarregado pelo próprio Xcode.
 
 ### Alternativa sem XcodeGen
 1. Xcode → *File → New → Project → iOS App* (Interface SwiftUI), nome `IssaFone`.
 2. Apaga os ficheiros gerados e arrasta para lá a pasta `IssaFone/` deste projeto.
 3. *File → Add Package Dependencies…* e adiciona:
-   - `https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git` (produto `linphonesw`)
+   - `https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git` (branch `novideo/stable`, produto `linphonesw`). No teu Mac, o GitLab da Linphone funciona; só os servidores do GitHub é que são bloqueados.
    - `https://github.com/robbiehanson/XMPPFramework.git` (branch `master`)
+   - `https://github.com/CocoaLumberjack/CocoaLumberjack.git` (versão exata `3.8.5`, para o XMPPFramework compilar)
 4. Em *Signing & Capabilities*:
    - adiciona *Background Modes* → *Audio* e *Voice over IP*;
    - no Info, acrescenta `NSMicrophoneUsageDescription` e `NSLocalNetworkUsageDescription`.

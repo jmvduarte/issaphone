@@ -76,6 +76,8 @@ jobs:
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/IssaFone.app Payload/
           zip -qry IssaFone-unsigned.ipa Payload
+          echo "::notice::Frameworks incluídas: $(ls Payload/IssaFone.app/Frameworks | tr '\n' ' ')"
+          echo "::notice::Tamanho do .ipa: $(du -h IssaFone-unsigned.ipa | cut -f1)"
 
       - name: Publicar .ipa
         uses: actions/upload-artifact@v4
