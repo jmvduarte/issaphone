@@ -116,8 +116,9 @@ rm -f /tmp/issafone-of.p12
 chown daemon:daemon "\$KS" 2>/dev/null
 
 systemctl reload httpd 2>/dev/null
-asterisk -rx "module reload http" >/dev/null 2>&1
 asterisk -rx "sip reload" >/dev/null 2>&1
+# O certificado HTTPS do Asterisk só é relido ao reiniciar (quando não houver chamadas)
+asterisk -rx "core restart when convenient" >/dev/null 2>&1
 service openfire restart >/dev/null 2>&1
 EOF
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/issafone.sh
@@ -148,15 +149,38 @@ fi
 
 # -----------------------------------------------------------------------------
 passo "5. Asterisk: SIP sobre WebSocket seguro (8089)"
+# O Issabel gera o http_additional.conf (com o certificado autoassinado) e
+# inclui depois o http_custom.conf, reservado para personalizações: é aí que
+# fica o certificado Let's Encrypt, para não ser reescrito pelo Issabel.
 HTTP=/etc/asterisk/http.conf
-copia "$HTTP"
-[ -f "$HTTP" ] || echo "[general]" > "$HTTP"
-for kv in enabled=yes bindaddr=0.0.0.0 bindport=8088 tlsenable=yes tlsbindaddr=0.0.0.0:8089 \
-          tlscertfile=/etc/asterisk/keys/fullchain.pem tlsprivatekey=/etc/asterisk/keys/privkey.pem; do
-  crudini --set "$HTTP" general "${kv%%=*}" "${kv#*=}"
-done
-asterisk -rx "module reload http" >/dev/null
-sleep 1
+HTTPC=/etc/asterisk/http_custom.conf
+touch "$HTTPC"; copia "$HTTPC"
+sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$HTTPC"
+cat >> "$HTTPC" <<'EOF'
+; >>> IssaFone — certificado Let's Encrypt no WSS (8089) (gerado pelo configurar-issabel.sh)
+enabled=yes
+tlsenable=yes
+tlsbindaddr=0.0.0.0:8089
+tlscertfile=/etc/asterisk/keys/fullchain.pem
+tlsprivatekey=/etc/asterisk/keys/privkey.pem
+; <<< IssaFone
+EOF
+grep -q "http_custom.conf" "$HTTP" 2>/dev/null || { copia "$HTTP"; echo "#include http_custom.conf" >> "$HTTP"; }
+
+cert_8089() { echo | timeout 8 openssl s_client -connect 127.0.0.1:8089 -servername "$DOMINIO" 2>/dev/null | openssl x509 -noout -issuer 2>/dev/null; }
+asterisk -rx "module reload http" >/dev/null; sleep 1
+if [ -f "$LE/fullchain.pem" ] && ! cert_8089 | grep -q "Let's Encrypt"; then
+  # O reload não volta a ler o certificado: só um reinício do Asterisk o faz
+  if [ "$(asterisk -rx 'core show channels count' | awk '/active call/{print $1}')" = "0" ]; then
+    echo "  (a reiniciar o Asterisk para carregar o certificado…)"
+    asterisk -rx "core restart now" >/dev/null 2>&1
+    for i in $(seq 1 30); do sleep 2; asterisk -rx "core show version" >/dev/null 2>&1 && break; done
+    sleep 3
+  else
+    aviso "Há chamadas a decorrer: o Asterisk reinicia quando terminarem (core restart when convenient)"
+    asterisk -rx "core restart when convenient" >/dev/null 2>&1
+  fi
+fi
 if asterisk -rx "http show status" | grep -q "8089"; then ok "HTTPS/WSS do Asterisk na porta 8089"
 else falha "O Asterisk não abriu a porta 8089 (vê: asterisk -rx 'http show status')"; fi
 for m in res_http_websocket res_srtp res_crypto; do
