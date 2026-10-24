@@ -1,0 +1,23 @@
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/out/
+*.jks
+*.keystore
+
+# iOS
+ios/*.xcodeproj/
+ios/build/
+ios/Payload/
+ios/*.ipa
+xcuserdata/
+DerivedData/
+
+# Editores / SO
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
