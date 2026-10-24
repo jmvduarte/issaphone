@@ -2,7 +2,7 @@
 
 # IssaFone
 
-Softphone com chat interno para o **Issabel 4**, com versões **Android** e **iOS**.
+Softphone com chat interno para o **Issabel 4**, com versões **Android**, **iOS** e **Web** (PC e iPhone no browser).
 - Chamadas de voz por **SIP** (Asterisk) com o Linphone SDK
 - Chat interno por **XMPP** (Openfire)
 
@@ -12,6 +12,7 @@ Projeto académico — CTESP Redes e Sistemas Informáticos, IPCA.
 |-------|------------|------------|------------------|
 | [`android/`](android/README.md) | Android 8+ | Kotlin, Jetpack Compose, Linphone, Smack | `.apk` (GitHub Actions, Linux) |
 | [`ios/`](ios/README.md) | iOS 16+ | Swift, SwiftUI, Linphone, XMPPFramework | `.ipa` sem assinatura (GitHub Actions, macOS) |
+| [`web/`](web/README.md) | PC e iPhone (browser) | HTML/JS, JsSIP (WebRTC), Strophe.js | GitHub Pages: https://jmvduarte.github.io/issaphone/ |
 
 A configuração do servidor Issabel (extensões, Openfire, firewall) está em [`android/README.md`](android/README.md).
 

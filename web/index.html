@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>IssaFone</title>
+  <meta name="description" content="Chamadas e chat interno do Issabel no browser">
+  <meta name="theme-color" content="#2F5BFF">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="IssaFone">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ============ Entrada ============ -->
+<main id="ecra-login" class="login" hidden>
+  <form id="form-login" class="cartao" autocomplete="on">
+    <div class="marca">
+      <img src="icons/icone-192.png" alt="" width="56" height="56">
+      <div>
+        <h1>IssaFone</h1>
+        <p class="sub">Chamadas e chat interno do Issabel</p>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>Servidor</legend>
+      <label>Domínio do Issabel
+        <input name="servidor" required placeholder="pbx.exemplo.pt" autocapitalize="off" spellcheck="false">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Telefone (SIP por WebRTC)</legend>
+      <div class="linha">
+        <label>Extensão
+          <input name="extensao" required inputmode="numeric" placeholder="201" autocomplete="username">
+        </label>
+        <label>Palavra-passe da extensão
+          <input name="passSip" type="password" required autocomplete="current-password">
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Chat (XMPP / Openfire)</legend>
+      <div class="linha">
+        <label>Domínio XMPP
+          <input name="dominioXmpp" placeholder="igual ao servidor" autocapitalize="off" spellcheck="false">
+        </label>
+        <label>Palavra-passe do chat
+          <input name="passXmpp" type="password" placeholder="a mesma da extensão">
+        </label>
+      </div>
+    </fieldset>
+
+    <details class="avancado">
+      <summary>Opções avançadas</summary>
+      <label>Endereço WebSocket SIP
+        <input name="wsSip" placeholder="wss://servidor:8089/ws" autocapitalize="off" spellcheck="false">
+      </label>
+      <label>Endereço WebSocket XMPP
+        <input name="wsXmpp" placeholder="wss://servidor:7443/ws/" autocapitalize="off" spellcheck="false">
+      </label>
+      <label>Servidor STUN (opcional, para uso fora da rede local)
+        <input name="stun" placeholder="stun:stun.l.google.com:19302" autocapitalize="off" spellcheck="false">
+      </label>
+    </details>
+
+    <p id="erro-login" class="erro" role="alert" hidden></p>
+    <button type="submit" class="primario">Entrar</button>
+    <p class="nota">As palavras-passe ficam guardadas só neste browser.</p>
+  </form>
+</main>
+
+<!-- ============ Aplicação ============ -->
+<div id="ecra-app" class="app" hidden>
+  <header class="topo">
+    <img src="icons/icone-192.png" alt="" width="32" height="32">
+    <div class="titulo">
+      <strong>IssaFone</strong>
+      <span class="estados">
+        <span id="estado-sip" class="estado"><i></i>Telefone: desligado</span>
+        <span id="estado-xmpp" class="estado"><i></i>Chat: desligado</span>
+      </span>
+    </div>
+    <button id="btn-notificacoes" class="discreto" hidden>Ativar notificações</button>
+    <button id="btn-sair" class="discreto">Sair</button>
+  </header>
+
+  <div class="corpo" data-vista="teclado">
+    <!-- Contactos -->
+    <section class="painel contactos" aria-label="Contactos">
+      <form id="form-contacto" class="adicionar">
+        <input name="novo" placeholder="Adicionar colega (ex.: 202)" autocapitalize="off" aria-label="Adicionar colega">
+        <button type="submit" aria-label="Adicionar">+</button>
+      </form>
+      <ul id="lista-contactos"></ul>
+      <p id="sem-contactos" class="vazio">Sem contactos. Adiciona colegas acima ou cria um grupo partilhado no Openfire.</p>
+    </section>
+
+    <!-- Conversa -->
+    <section class="painel conversa" aria-label="Conversa">
+      <div class="conversa-topo">
+        <button id="btn-voltar" class="discreto voltar" aria-label="Voltar">‹</button>
+        <strong id="conversa-nome">Escolhe um contacto</strong>
+        <button id="btn-ligar-contacto" class="ligar-pequeno" hidden>Ligar</button>
+      </div>
+      <ol id="mensagens" aria-live="polite"></ol>
+      <form id="form-mensagem" class="escrever" hidden>
+        <input name="texto" placeholder="Mensagem" autocomplete="off" aria-label="Mensagem">
+        <button type="submit" class="primario">Enviar</button>
+      </form>
+    </section>
+
+    <!-- Teclado -->
+    <section class="painel teclado" aria-label="Teclado">
+      <input id="numero" class="numero" placeholder="Extensão ou número" inputmode="tel" aria-label="Número a marcar">
+      <div class="teclas" id="teclas"></div>
+      <div class="acoes-teclado">
+        <button id="btn-apagar" class="discreto" aria-label="Apagar">⌫</button>
+        <button id="btn-ligar" class="ligar" aria-label="Ligar">
+          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+        </button>
+        <span></span>
+      </div>
+    </section>
+  </div>
+
+  <nav class="separadores" aria-label="Navegação">
+    <button data-vista="teclado" class="ativo">Teclado</button>
+    <button data-vista="contactos">Chat <span id="por-ler" class="contador" hidden></span></button>
+  </nav>
+
+  <!-- Chamada -->
+  <div id="chamada" class="chamada" hidden role="dialog" aria-modal="true" aria-labelledby="chamada-remoto">
+    <div class="chamada-cartao">
+      <div class="avatar" id="chamada-avatar"></div>
+      <h2 id="chamada-remoto"></h2>
+      <p id="chamada-estado"></p>
+      <p id="chamada-tempo" class="tempo" hidden>00:00</p>
+      <div id="chamada-dtmf" class="dtmf" hidden></div>
+      <div class="chamada-botoes">
+        <button id="btn-atender" class="redondo verde" aria-label="Atender" hidden>Atender</button>
+        <button id="btn-mute" class="redondo cinza" hidden>Silenciar</button>
+        <button id="btn-teclas" class="redondo cinza" hidden>Teclas</button>
+        <button id="btn-desligar" class="redondo vermelho" aria-label="Desligar">Desligar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<audio id="audio-remoto" autoplay playsinline></audio>
+
+<script src="vendor/jssip-3.13.9.min.js"></script>
+<script src="vendor/strophe-3.1.1.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

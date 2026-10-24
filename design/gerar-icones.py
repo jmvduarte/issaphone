@@ -110,6 +110,16 @@ def main():
         mono.putalpha(ImageChops.subtract(a, b))
         guardar(mono, pasta / "ic_launcher_monochrome.png")
 
+    # ---------- Webapp (PWA) ----------
+    print("Webapp")
+    web = RAIZ / "web/icons"
+    for px in (192, 512):
+        guardar(render(completo, px), web / f"icone-{px}.png")
+    # "maskable": o sistema pode recortar em círculo, por isso o conteúdo fica mais pequeno
+    guardar(render(svg(FUNDO + escalar(balao() + glifo(), 0.88)), 512), web / "icone-maskable-512.png")
+    guardar(render(completo, 180).convert("RGB"), web / "apple-touch-icon.png")
+    guardar(render(completo, 64), web / "favicon.png")
+
     # ---------- Pré-visualização (README) ----------
     print("Pré-visualização")
     base = render(completo, 1024)
