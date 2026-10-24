@@ -31,10 +31,13 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // "no-cache": confirma sempre com o servidor, para nunca ficar presa numa versão antiga
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((r) => {
-        const copia = r.clone();
-        caches.open(VERSAO).then((c) => c.put(e.request, copia));
+        if (r.ok) {
+          const copia = r.clone();
+          caches.open(VERSAO).then((c) => c.put(e.request, copia));
+        }
         return r;
       })
       .catch(() => caches.match(e.request))
