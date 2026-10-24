@@ -165,38 +165,86 @@ done
 
 # -----------------------------------------------------------------------------
 passo "6. Extensões da webapp com WebRTC ($EXT_WEB)"
+# As opções WebRTC só podem ser acrescentadas a extensões que existem: um bloco
+# "[205](+)" para uma extensão inexistente faz falhar o sip.conf inteiro.
+# Por isso, um pequeno serviço vigia o sip_additional.conf (que o Issabel
+# reescreve ao carregar em "Aplicar") e aplica as opções às extensões web
+# que existirem — criar uma extensão nova não obriga a correr este script.
 POST=/etc/asterisk/sip_custom_post.conf
 touch "$POST"; copia "$POST"
-sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$POST"
-{
-  echo "; >>> IssaFone — opções WebRTC (gerado pelo configurar-issabel.sh; não editar à mão)"
-  for e in $(expandir "$EXT_WEB"); do
-    cat <<EOF
-[$e](+)
-transport=wss,ws,udp
-avpf=yes
-force_avp=yes
-icesupport=yes
-encryption=yes
-dtlsenable=yes
-dtlsverify=no
-dtlscertfile=/etc/asterisk/keys/fullchain.pem
-dtlsprivatekey=/etc/asterisk/keys/privkey.pem
-dtlssetup=actpass
-rtcp_mux=yes
-nat=force_rport,comedia
-disallow=all
-allow=ulaw,alaw,opus
 
+cat > /usr/local/sbin/issafone-webrtc <<EOF
+#!/bin/bash
+# IssaFone: aplica as opções WebRTC às extensões web ($EXT_WEB) que existem no Issabel.
+# Gerado pelo configurar-issabel.sh. Corre sozinho quando as extensões mudam.
+EXT_WEB="$EXT_WEB"
+POST=/etc/asterisk/sip_custom_post.conf
+ADD=/etc/asterisk/sip_additional.conf
 EOF
+cat >> /usr/local/sbin/issafone-webrtc <<'EOF'
+expandir() {
+  local r=() p
+  IFS=',' read -ra partes <<< "$1"
+  for p in "${partes[@]}"; do
+    if [[ $p =~ ^([0-9]+)-([0-9]+)$ ]]; then r+=($(seq "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")); else r+=("$p"); fi
+  done
+  echo "${r[@]}"
+}
+novo=$(
+  echo "; >>> IssaFone — opções WebRTC (gerado automaticamente; não editar à mão)"
+  for e in $(expandir "$EXT_WEB"); do
+    grep -q "^\[$e\]" "$ADD" 2>/dev/null || continue
+    printf '%s\n' "[$e](+)" transport=wss,ws,udp avpf=yes force_avp=yes icesupport=yes encryption=yes \
+      dtlsenable=yes dtlsverify=no dtlscertfile=/etc/asterisk/keys/fullchain.pem \
+      dtlsprivatekey=/etc/asterisk/keys/privkey.pem dtlssetup=actpass rtcp_mux=yes \
+      nat=force_rport,comedia disallow=all allow=ulaw,alaw,opus ""
   done
   echo "; <<< IssaFone"
-} >> "$POST"
+)
+atual=$(sed -n '/^; >>> IssaFone/,/^; <<< IssaFone/p' "$POST" 2>/dev/null)
+[ "$novo" = "$atual" ] && exit 0
+touch "$POST"
+sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$POST"
+printf '%s\n' "$novo" >> "$POST"
+asterisk -rx "sip reload" >/dev/null 2>&1
+logger -t issafone "Opções WebRTC atualizadas"
+EOF
+chmod +x /usr/local/sbin/issafone-webrtc
+
+cat > /etc/systemd/system/issafone-webrtc.service <<'EOF'
+[Unit]
+Description=IssaFone: opcoes WebRTC nas extensoes web
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/sbin/issafone-webrtc
+EOF
+cat > /etc/systemd/system/issafone-webrtc.path <<'EOF'
+[Unit]
+Description=IssaFone: vigiar alteracoes as extensoes do Issabel
+
+[Path]
+PathChanged=/etc/asterisk/sip_additional.conf
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now issafone-webrtc.path >/dev/null 2>&1 \
+  && ok "Serviço automático ativo: extensões web novas ficam com WebRTC ao carregar em \"Aplicar\" no Issabel" \
+  || falha "Não foi possível ativar o serviço issafone-webrtc.path"
+
 grep -q "sip_custom_post.conf" /etc/asterisk/sip.conf || aviso "O sip.conf não inclui o sip_custom_post.conf — as opções WebRTC podem não ser lidas"
-asterisk -rx "sip reload" >/dev/null; sleep 1
+# Limpa a versão antiga deste bloco (se existir) e aplica já
+sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$POST"
+/usr/local/sbin/issafone-webrtc
+sleep 1
+if asterisk -rx "sip show peers" >/dev/null 2>&1 && asterisk -rx "sip show peers" | grep -q "sip peers"; then ok "O sip.conf carregou sem erros"
+else falha "Problema a carregar o sip.conf — vê: asterisk -rx 'sip show peers'"; fi
 for e in $(expandir "$EXT_WEB"); do
-  if asterisk -rx "sip show peer $e" | grep -q "not found"; then
-    aviso "A extensão $e não existe — cria-a no Issabel (PBX → Extensões, tipo SIP) e volta a correr o script"
+  if ! grep -q "^\[$e\]" /etc/asterisk/sip_additional.conf 2>/dev/null; then
+    echo "  · $e ainda não existe (quando a criares no Issabel, fica preparada automaticamente)"
   elif asterisk -rx "sip show peer $e" | grep -qiE "Allowed.Tr[a-z]*p.*WSS"; then ok "Extensão $e preparada para WebRTC"
   else falha "A extensão $e não ficou com transporte WSS"; fi
 done

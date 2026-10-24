@@ -10,7 +10,7 @@
    - UDP 5060 e 10000-20000.
 
    A porta 80 é obrigatória para o Let's Encrypt.
-3. Cria no Issabel as extensões SIP da webapp (por omissão 201–210). As do Android podem ser quaisquer outras.
+3. Cria no Issabel as extensões que quiseres. As da webapp devem ficar no intervalo 201–210. As do Android/iPhone podem ser quaisquer outras.
 
 ## Correr (como root)
 
@@ -21,7 +21,16 @@ bash configurar-issabel.sh
 
 Para usar outras extensões web: `EXT_WEB=301-305 bash configurar-issabel.sh`.
 
-Podes voltar a correr o script sempre que quiseres. Por exemplo, depois de criares novas extensões web, corre-o outra vez para lhes aplicar as opções WebRTC.
+Só é preciso correr o script uma vez. Podes voltar a corrê-lo sem problema, por exemplo para mudar o intervalo de extensões web.
+
+## Criar extensões depois
+
+Não é preciso voltar a correr o script:
+
+- **Android/iPhone:** cria a extensão no Issabel e carrega em *Aplicar*. A conta de chat existe logo, com a mesma palavra-passe.
+- **Web (201–210):** igual. O serviço `issafone-webrtc` deteta a alteração e aplica as opções WebRTC à extensão nova, normalmente em poucos segundos.
+
+Para veres o que o serviço fez: `journalctl -t issafone`.
 
 ## O que faz
 
@@ -30,7 +39,7 @@ Podes voltar a correr o script sempre que quiseres. Por exemplo, depois de criar
 | Let's Encrypt | Certificado para o domínio, renovado automaticamente. Em cada renovação, é copiado para o Asterisk e o Openfire |
 | Apache | HTTPS com o certificado válido |
 | Asterisk | WebSocket seguro na porta 8089 (`http.conf`) |
-| Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf` |
+| Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf`, aplicadas só às extensões que existem, e um serviço que as atualiza sozinho quando crias extensões |
 | Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
 | Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
 | Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` |
