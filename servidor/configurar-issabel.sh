@@ -288,8 +288,15 @@ else falha "Problema a carregar o sip.conf — vê: asterisk -rx 'sip show peers
 for e in $(expandir "$EXT_WEB"); do
   if ! grep -q "^\[$e\]" /etc/asterisk/sip_additional.conf 2>/dev/null; then
     echo "  · $e ainda não existe (quando a criares no Issabel, fica preparada automaticamente)"
-  elif asterisk -rx "sip show peer $e" | grep -qiE "Allowed.Tr[a-z]*p.*WSS"; then ok "Extensão $e preparada para WebRTC"
-  else falha "A extensão $e não ficou com transporte WSS"; fi
+  else
+    # O "sip reload" demora um pouco: tenta durante alguns segundos antes de dar erro
+    pronto=0
+    for i in 1 2 3 4 5 6; do
+      asterisk -rx "sip show peer $e" | grep -qiE "Allowed.Tr[a-z]*p.*WSS" && { pronto=1; break; }
+      sleep 2
+    done
+    [ $pronto = 1 ] && ok "Extensão $e preparada para WebRTC" || falha "A extensão $e não ficou com transporte WSS"
+  fi
 done
 
 # -----------------------------------------------------------------------------
