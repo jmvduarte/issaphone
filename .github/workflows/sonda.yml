@@ -5,12 +5,15 @@ jobs:
     runs-on: macos-15
     steps:
       - run: |
+          set +e
           curl -sSfL -o sdk.zip https://download.linphone.org/releases/ios/linphone-sdk-ios-5.3.5.zip
-          echo "::notice::tamanho $(du -h sdk.zip | cut -f1)"
           unzip -q sdk.zip -d sdk
-          find sdk -maxdepth 4 -type d | grep -v "\.xcframework/" | head -40 | while read -r d; do echo "::notice::dir $d"; done
-          find sdk -name "*.xcframework" -maxdepth 6 | sed 's#.*/##' | sort | tr '\n' ' ' | xargs -I{} echo "::notice::xcf {}"
-          find sdk -name "*.swift" | head -10 | while read -r f; do echo "::notice::swift $f ($(wc -l < "$f") linhas)"; done
-          find sdk -name "Package.swift" -o -name "*.podspec" | while read -r f; do echo "::notice::meta $f"; done
-          P=$(find sdk -name "Package.swift" | head -1); [ -n "$P" ] && head -c 900 "$P" | tr '\n' ' ' | xargs -0 -I{} echo "::notice::pkg {}"
+          X=sdk/linphone-sdk/apple-darwin/XCFrameworks
+          echo "::notice::xcf $(ls $X | tr '\n' ' ')"
+          ls sdk/linphone-sdk/apple-darwin | tr '\n' ' ' | sed 's/^/::notice::raiz /'; echo
+          find sdk -name "*.swift" -not -path "*/Headers/*" | head -10 | while read -r f; do echo "::notice::swift $f ($(wc -l < "$f") linhas)"; done
+          find sdk -name "*.swiftinterface" | head -5 | while read -r f; do echo "::notice::swiftinterface $f"; done
+          find sdk -name "Info.plist" -path "*linphonesw*" -maxdepth 6 | head -3 | while read -r f; do echo "::notice::plist $f"; done
+          ls $X/linphonesw.xcframework 2>/dev/null | tr '\n' ' ' | sed 's/^/::notice::linphonesw.xcf /'; echo
+          ls -d $X/*/ios-arm64*/ 2>/dev/null | head -3 | sed 's/^/::notice::slice /'
           true
