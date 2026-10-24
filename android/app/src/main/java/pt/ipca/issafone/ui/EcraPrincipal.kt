@@ -60,7 +60,7 @@ fun EcraPrincipal(vm: AppViewModel) {
     // Tocar numa notificação de mensagem abre logo essa conversa
     val pedido by vm.abrirConversa.collectAsState()
     LaunchedEffect(pedido) {
-        pedido?.let { tab = 2; conversaCom = it; vm.pedirConversa(null) }
+        pedido?.let { tab = 3; conversaCom = it; vm.pedirConversa(null) }
     }
     // Sempre que a app volta ao ecrã, procura atualizações (no máximo de 10 em 10 min)
     val escopo = rememberCoroutineScope()
@@ -107,10 +107,11 @@ fun EcraPrincipal(vm: AppViewModel) {
             NavigationBar {
                 val perdidas by vm.sip.registoChamadas.perdidas.collectAsState()
                 NavigationBarItem(tab == 0, { tab = 0; conversaCom = null }, icon = { Text("⌨") }, label = { Text("Teclado") })
-                NavigationBarItem(tab == 1, { tab = 1; vm.sip.registoChamadas.marcarVistas() },
+                NavigationBarItem(tab == 1, { tab = 1 }, icon = { Text("👥") }, label = { Text("Contactos") })
+                NavigationBarItem(tab == 2, { tab = 2; vm.sip.registoChamadas.marcarVistas() },
                     icon = { BadgedBox(badge = { if (perdidas > 0) Badge { Text("$perdidas") } }) { Text("📞") } },
                     label = { Text("Chamadas") })
-                NavigationBarItem(tab == 2, { tab = 2 }, icon = { Text("💬") }, label = { Text("Chat") })
+                NavigationBarItem(tab == 3, { tab = 3 }, icon = { Text("💬") }, label = { Text("Chat") })
             }
         }
     ) { pad ->
@@ -120,7 +121,8 @@ fun EcraPrincipal(vm: AppViewModel) {
                 Box(Modifier.weight(1f)) {
                     when {
                         tab == 0 -> Teclado(onChamar = { n, video -> vm.sip.chamar(n, video) })
-                        tab == 1 -> ListaChamadas(vm)
+                        tab == 1 -> Agenda(vm, onMensagem = { conversaCom = it; tab = 3 })
+                        tab == 2 -> ListaChamadas(vm)
                         conversaCom != null -> Conversa(vm, conversaCom!!,
                             onVoltar = { conversaCom = null },
                             onLigar = { jid, video -> vm.sip.chamar(jid.substringBefore("@"), video); tab = 0 })
@@ -171,6 +173,57 @@ private fun Teclado(onChamar: (String, Boolean) -> Unit) {
                 onClick = { onChamar(numero, true) }, enabled = numero.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = Azul)
             ) { Text("Vídeo") }
+        }
+    }
+}
+
+/* ============================== Agenda (contactos para ligar) ============================== */
+
+@Composable
+private fun Agenda(vm: AppViewModel, onMensagem: (String) -> Unit) {
+    val contactos by vm.xmpp.contactos.collectAsState()
+    var filtro by remember { mutableStateOf("") }
+    fun simples(t: String) = java.text.Normalizer.normalize(t, java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}"), "").lowercase()
+    val lista = contactos
+        .filter { c -> filtro.isBlank() || simples(c.nome + " " + c.jid.substringBefore("@")).contains(simples(filtro.trim())) }
+        .sortedBy { simples(it.nome) }
+
+    Column(Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            filtro, { filtro = it }, placeholder = { Text("Procurar nome ou extensão") },
+            singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp)
+        )
+        if (lista.isEmpty()) {
+            Text(if (filtro.isBlank()) "Sem contactos." else "Nenhum contacto encontrado.",
+                color = Color.Gray, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp))
+        }
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(lista, key = { it.jid }) { c ->
+                val num = c.jid.substringBefore("@")
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.sip.chamar(num, false) }.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(42.dp)) {
+                        Box(Modifier.matchParentSize().clip(CircleShape).background(Azul), contentAlignment = Alignment.Center) {
+                            Text(iniciais(c.nome), color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(CircleShape)
+                            .background(if (c.online) Color(0xFF43A047) else Color.Gray))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(c.nome, style = MaterialTheme.typography.titleMedium)
+                        Text("$num · ${if (c.online) "Disponível" else "Ausente"}",
+                            style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    TextButton(onClick = { onMensagem(c.jid) }, contentPadding = PaddingValues(8.dp)) { Text("💬", fontSize = 18.sp) }
+                    TextButton(onClick = { vm.sip.chamar(num, false) }, contentPadding = PaddingValues(8.dp)) { Text("📞", fontSize = 18.sp) }
+                    TextButton(onClick = { vm.sip.chamar(num, true) }, contentPadding = PaddingValues(8.dp)) { Text("🎥", fontSize = 18.sp) }
+                }
+                HorizontalDivider()
+            }
         }
     }
 }

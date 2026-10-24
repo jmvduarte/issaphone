@@ -86,7 +86,15 @@
     <section class="painel contactos" aria-label="Contactos" data-lista="conversas">
       <div class="abas-lista" role="tablist">
         <button data-lista="conversas" class="ativo" role="tab">Conversas</button>
+        <button data-lista="agenda" role="tab">Contactos</button>
         <button data-lista="chamadas" role="tab">Chamadas <span class="contador perdidas" hidden></span></button>
+      </div>
+      <div id="lista-agenda">
+        <div class="adicionar">
+          <input id="pesquisa-agenda" type="search" placeholder="Procurar nome ou extensão" aria-label="Procurar contacto" autocomplete="off">
+        </div>
+        <ul id="agenda" class="lista"></ul>
+        <p id="sem-agenda" class="vazio">Sem contactos.</p>
       </div>
       <div id="lista-chamadas">
         <div class="secao">
@@ -148,6 +156,7 @@
 
   <nav class="separadores" aria-label="Navegação">
     <button data-vista="teclado" class="ativo">Teclado</button>
+    <button data-vista="agenda">Contactos</button>
     <button data-vista="chamadas">Chamadas <span class="contador perdidas" hidden></span></button>
     <button data-vista="contactos">Chat <span id="por-ler" class="contador" hidden></span></button>
   </nav>

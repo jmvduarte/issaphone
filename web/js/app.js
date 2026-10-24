@@ -670,9 +670,9 @@ const UI = {
 
   /** v: 'teclado' | 'chamadas' | 'contactos' | 'conversa' */
   vista(v) {
-    if (v === 'chamadas') this.lista('chamadas');
+    if (v === 'chamadas' || v === 'agenda') this.lista(v);
     else if (v === 'contactos') this.lista('conversas');
-    $('.corpo').dataset.vista = v === 'chamadas' ? 'contactos' : v;
+    $('.corpo').dataset.vista = v === 'chamadas' || v === 'agenda' ? 'contactos' : v;
     document.querySelectorAll('.separadores button').forEach((b) =>
       b.classList.toggle('ativo', b.dataset.vista === v || (v === 'conversa' && b.dataset.vista === 'contactos')));
   },
@@ -682,6 +682,52 @@ const UI = {
     $('.contactos').dataset.lista = qual;
     document.querySelectorAll('.abas-lista button').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === qual));
     if (qual === 'chamadas') { Registo.marcarVistas(); this.chamadas(); }
+    if (qual === 'agenda') this.agenda();
+  },
+
+  /** Agenda: todas as extensões, com pesquisa e botões para ligar, vídeo e mensagem. */
+  agenda() {
+    const filtro = ($('#pesquisa-agenda').value || '').trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const lista = [...Xmpp.contactos.values()]
+      .map((c) => ({ ...c, num: c.jid.split('@')[0] }))
+      .filter((c) => !filtro || (c.nome + ' ' + c.num).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(filtro))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+    const botao = (txt, titulo, fn) => {
+      const b = document.createElement('button');
+      b.className = 'rapido';
+      b.textContent = txt;
+      b.title = titulo;
+      b.setAttribute('aria-label', titulo);
+      b.onclick = fn;
+      return b;
+    };
+    $('#agenda').replaceChildren(...lista.map((c) => {
+      const li = document.createElement('li');
+      li.className = c.online ? 'online' : '';
+      const linha = document.createElement('button');
+      linha.className = 'contacto-linha';
+      linha.title = `Ligar a ${c.nome}`;
+      const av = document.createElement('span');
+      av.className = 'iniciais';
+      av.textContent = this.iniciais(c.nome);
+      const info = document.createElement('span');
+      info.className = 'contacto-info';
+      const n = document.createElement('strong');
+      n.textContent = c.nome;
+      const sub = document.createElement('small');
+      sub.textContent = `${c.num} · ${c.online ? 'Disponível' : 'Ausente'}`;
+      info.append(n, sub);
+      linha.append(av, info);
+      linha.onclick = () => Sip.chamar(c.num, false);
+      li.append(linha,
+        botao('💬', `Mensagem para ${c.nome}`, () => this.abrirConversa(c.jid)),
+        botao('📞', `Ligar a ${c.nome}`, () => Sip.chamar(c.num, false)),
+        botao('🎥', `Videochamada para ${c.nome}`, () => Sip.chamar(c.num, true)));
+      return li;
+    }));
+    $('#sem-agenda').hidden = lista.length > 0;
+    $('#sem-agenda').textContent = filtro ? 'Nenhum contacto encontrado.' : 'Sem contactos.';
   },
 
   chamadas() {
@@ -801,6 +847,7 @@ const UI = {
       return this.linha({ jid: c.jid, nome: c.nome, online: c.online, sub: c.nome !== num ? `${num} · ${estado}` : estado });
     }));
     $('#sem-contactos').hidden = lista.length > 0;
+    if ($('.contactos').dataset.lista === 'agenda') this.agenda();
     this.contadorTotal();
     if (this.conversaCom) $('#conversa-nome').textContent = this.tituloConversa(this.conversaCom);
   },
@@ -1060,10 +1107,11 @@ function ligarEventos() {
 
   document.querySelectorAll('.separadores button').forEach((b) => {
     b.onclick = () => UI.vista(b.dataset.vista === 'contactos' && UI.conversaCom && $('.corpo').dataset.vista === 'teclado' ? 'conversa' : b.dataset.vista);
-    if (b.dataset.vista === 'chamadas') b.onclick = () => UI.vista('chamadas');
+    if (b.dataset.vista === 'chamadas' || b.dataset.vista === 'agenda') b.onclick = () => UI.vista(b.dataset.vista);
   });
   $('#btn-voltar').onclick = () => UI.vista('contactos');
   document.querySelectorAll('.abas-lista button').forEach((b) => { b.onclick = () => UI.lista(b.dataset.lista); });
+  $('#pesquisa-agenda').oninput = () => UI.agenda();
   $('#btn-limpar-chamadas').onclick = () => {
     if (confirm('Apagar o registo de chamadas deste browser?')) { Registo.limpar(); UI.chamadas(); }
   };
