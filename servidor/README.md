@@ -42,7 +42,7 @@ Para veres o que o serviço fez: `journalctl -t issafone`.
 | Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf`, aplicadas só às extensões que existem, e um serviço que as atualiza sozinho quando crias extensões |
 | Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
 | Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
-| Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` |
+| Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` e atualizada sozinha a partir do GitHub (de 15 em 15 min; à mão: `issafone-atualizar-web`) |
 
 Antes de alterar os ficheiros originais, o script guarda uma cópia de cada um com o sufixo `.antes-issafone`.
 

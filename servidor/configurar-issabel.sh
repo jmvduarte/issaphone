@@ -411,16 +411,12 @@ aviso "Se usares o Firewall na página do Issabel, acrescenta lá as mesmas port
 
 # -----------------------------------------------------------------------------
 passo "9. Webapp em https://$DOMINIO/issafone/"
-TMP=$(mktemp -d)
-if curl -fsSL "https://github.com/$REPO/archive/refs/heads/main.tar.gz" | tar xz -C "$TMP"; then
-  rm -rf /var/www/html/issafone
-  cp -a "$TMP"/*/web /var/www/html/issafone
-  chown -R asterisk:asterisk /var/www/html/issafone 2>/dev/null
-  ok "Webapp instalada em /var/www/html/issafone"
+# Instala o atualizador (de 15 em 15 minutos fica igual à versão do GitHub)
+if curl -fsSL "https://raw.githubusercontent.com/$REPO/main/servidor/atualizar-webapp.sh" | REPO="$REPO" bash -s instalar | sed 's/^/  /'; then
+  ok "Webapp instalada em /var/www/html/issafone (atualiza-se sozinha)"
 else
-  falha "Não foi possível descarregar a webapp do GitHub"
+  falha "Não foi possível instalar a webapp a partir do GitHub"
 fi
-rm -rf "$TMP"
 
 # -----------------------------------------------------------------------------
 passo "10. Verificação final"
