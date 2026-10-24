@@ -1,7 +1,7 @@
 # Compila o IssaFone para Android e gera os .apk.
 #  - Sempre: APK de debug (instala-se diretamente no telemóvel).
 #  - Se existirem os Secrets da keystore: APK de release assinado.
-#  - Ao criar uma tag vX.Y (ex.: v1.0): publica o APK numa Release do GitHub.
+#  - Cada build do main (e cada tag vX.Y) publica o APK numa Release do GitHub.
 
 name: Android build
 
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # necessário para criar a Release nas tags
+  contents: write   # necessário para criar as Releases
 
 jobs:
   build:
@@ -74,8 +74,18 @@ jobs:
           path: android/out/*.apk
           retention-days: 14
 
-      - name: Criar Release (tags vX.Y)
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Cada build do main fica numa Release própria (android-N). O link
+      # https://github.com/<utilizador>/<repo>/releases/latest dá sempre o APK mais recente.
+      - name: Publicar Release com o APK
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('android-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('IssaFone Android (build {0})', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            APK do IssaFone gerado automaticamente a partir do commit ${{ github.sha }}.
+
+            Instala o **IssaFone-debug.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
           files: android/out/*.apk
