@@ -1,4 +1,5 @@
-# Gera o IssaFone.xcodeproj com XcodeGen:
+# Gera o IssaFone.xcodeproj com XcodeGen. A partir da pasta ios/:
+#   ./scripts/obter-linphone.sh     (descarrega o SDK Linphone, ~150 MB)
 #   brew install xcodegen
 #   xcodegen
 name: IssaFone
@@ -8,22 +9,61 @@ options:
     iOS: "16.0"
 
 packages:
-  linphonesw:
-    url: https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git
-    branch: novideo/stable   # SDK sem vídeo (mais leve); o pacote usa ramos, não versões
   XMPPFramework:
     url: https://github.com/robbiehanson/XMPPFramework.git
     branch: master
 
 targets:
+  # Interface Swift da Linphone num módulo próprio, para "import linphonesw"
+  # funcionar como no pacote oficial (e evitar choques de nomes, ex.: Config).
+  linphonesw:
+    type: framework
+    platform: iOS
+    sources:
+      - path: LinphoneSDK/linphonesw
+    dependencies:
+      - framework: LinphoneSDK/XCFrameworks/linphone.xcframework
+        embed: false
+      - framework: LinphoneSDK/XCFrameworks/bctoolbox.xcframework
+        embed: false
+      - framework: LinphoneSDK/XCFrameworks/belle-sip.xcframework
+        embed: false
+      - framework: LinphoneSDK/XCFrameworks/mediastreamer2.xcframework
+        embed: false
+      - framework: LinphoneSDK/XCFrameworks/ortp.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pt.ipca.issafone.linphonesw
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+        DEFINES_MODULE: YES
+        SWIFT_SUPPRESS_WARNINGS: YES
+
   IssaFone:
     type: application
     platform: iOS
     sources: [IssaFone]
     scheme: {}   # esquema partilhado, necessário para compilar no GitHub Actions
     dependencies:
-      - package: linphonesw
+      - target: linphonesw
       - package: XMPPFramework
+      - framework: LinphoneSDK/XCFrameworks/bctoolbox.xcframework
+      - framework: LinphoneSDK/XCFrameworks/bctoolbox-ios.xcframework
+      - framework: LinphoneSDK/XCFrameworks/belcard.xcframework
+      - framework: LinphoneSDK/XCFrameworks/belle-sip.xcframework
+      - framework: LinphoneSDK/XCFrameworks/belr.xcframework
+      - framework: LinphoneSDK/XCFrameworks/lime.xcframework
+      - framework: LinphoneSDK/XCFrameworks/linphone.xcframework
+      - framework: LinphoneSDK/XCFrameworks/mediastreamer2.xcframework
+      - framework: LinphoneSDK/XCFrameworks/msamr.xcframework
+      - framework: LinphoneSDK/XCFrameworks/mscodec2.xcframework
+      - framework: LinphoneSDK/XCFrameworks/msopenh264.xcframework
+      - framework: LinphoneSDK/XCFrameworks/mssilk.xcframework
+      - framework: LinphoneSDK/XCFrameworks/mswebrtc.xcframework
+      - framework: LinphoneSDK/XCFrameworks/ortp.xcframework
+      - framework: LinphoneSDK/XCFrameworks/ZXing.xcframework
     info:
       path: IssaFone/Info.plist
       properties:

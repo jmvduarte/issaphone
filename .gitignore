@@ -12,6 +12,7 @@ ios/*.xcodeproj/
 ios/build/
 ios/Payload/
 ios/*.ipa
+ios/LinphoneSDK/
 xcuserdata/
 DerivedData/
 

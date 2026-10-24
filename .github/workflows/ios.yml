@@ -26,18 +26,14 @@ jobs:
           sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
           xcodebuild -version
 
-      - name: Diagnóstico de rede (Linphone)
-        continue-on-error: true
-        run: |
-          for u in https://gitlab.linphone.org https://download.linphone.org/releases/ios/; do
-            for ip in 4 6; do
-              c=$(curl -s -o /dev/null -w '%{http_code}' -$ip --max-time 15 "$u" || echo "falhou")
-              echo "::notice::IPv$ip $u -> $c"
-            done
-          done
-          curl -s --max-time 20 https://download.linphone.org/releases/ios/ \
-            | grep -oE 'linphone-sdk[^"<>]*\.zip' | sort -uV | tail -6 \
-            | while read -r f; do echo "::notice::zip iOS disponível: $f"; done
+      - name: Cache do SDK Linphone
+        uses: actions/cache@v4
+        with:
+          path: ios/LinphoneSDK
+          key: linphone-ios-${{ hashFiles('ios/scripts/obter-linphone.sh') }}
+
+      - name: Obter SDK Linphone (download.linphone.org)
+        run: bash scripts/obter-linphone.sh
 
       - name: Gerar projeto Xcode (XcodeGen)
         run: |
