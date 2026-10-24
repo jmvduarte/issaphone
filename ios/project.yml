@@ -10,7 +10,7 @@ options:
 packages:
   linphonesw:
     url: https://gitlab.linphone.org/BC/public/linphone-sdk-swift-ios.git
-    from: 5.3.0
+    branch: novideo/stable   # SDK sem vídeo (mais leve); o pacote usa ramos, não versões
   XMPPFramework:
     url: https://github.com/robbiehanson/XMPPFramework.git
     branch: master
