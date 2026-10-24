@@ -77,7 +77,12 @@ fun EcraPrincipal(vm: AppViewModel) {
         topBar = {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer).padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("IssaFone", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    Text("IssaFone", style = MaterialTheme.typography.titleLarge)
+                    Text(" ${pt.ipca.issafone.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray, modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        escopo.launch { pt.ipca.issafone.atualizacao.Atualizador.verificarEInstalar(ctx, manual = true) }
+                    }) { Text("Atualizar") }
                     TextButton(onClick = { vm.sair() }) { Text("Sair") }
                 }
                 Text("Telefone: $registo", style = MaterialTheme.typography.bodySmall)

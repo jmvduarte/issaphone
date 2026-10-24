@@ -99,13 +99,13 @@ class IssaFoneService : Service() {
         }
     }
 
-    /** De 6 em 6 horas procura uma versão nova (nunca durante uma chamada). */
+    /** De hora a hora procura uma versão nova (nunca durante uma chamada). */
     private fun procurarAtualizacoes() = scope.launch {
         delay(60_000) // deixa o registo SIP estabilizar primeiro
         while (isActive) {
             val c = app.sip.chamada.value
             if (!c.ativa && !c.aTocar) Atualizador.verificarEInstalar(this@IssaFoneService)
-            delay(6 * 60 * 60 * 1000L)
+            delay(60 * 60 * 1000L)
         }
     }
 

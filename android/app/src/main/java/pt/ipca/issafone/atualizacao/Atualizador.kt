@@ -42,54 +42,83 @@ object Atualizador {
 
     fun definirEstado(texto: String?) { _estado.value = texto }
 
-    /** Consulta o GitHub. Devolve a versão nova, ou null se já estiver atualizado. */
-    suspend fun procurar(): Versao? = withContext(Dispatchers.IO) {
-        val con = (URL(api).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", "IssaFone/${BuildConfig.VERSION_NAME}")
-        }
-        try {
-            if (con.responseCode != 200) return@withContext null
-            val json = JSONObject(con.inputStream.bufferedReader().use { it.readText() })
-            val codigo = json.getString("tag_name").removePrefix("android-").toIntOrNull()
-                ?: return@withContext null
-            if (codigo <= BuildConfig.VERSION_CODE) return@withContext null
+    /** Resultado de uma procura no GitHub. */
+    sealed class Resultado {
+        data class Nova(val versao: Versao) : Resultado()
+        object EmDia : Resultado()
+        data class Erro(val motivo: String) : Resultado()
+    }
 
-            val assets = json.getJSONArray("assets")
-            val url = (0 until assets.length())
-                .map { assets.getJSONObject(it) }
-                .firstOrNull { it.getString("name") == NOME_APK }
-                ?.getString("browser_download_url")
-                ?: return@withContext null
-            Versao(codigo, "1.0.$codigo", url)
-        } finally {
-            con.disconnect()
+    /** Consulta o GitHub e diz se há versão nova, se está em dia ou porque falhou. */
+    suspend fun procurar(): Resultado = withContext(Dispatchers.IO) {
+        try {
+            val con = (URL(api).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                setRequestProperty("Accept", "application/vnd.github+json")
+                setRequestProperty("User-Agent", "IssaFone/${BuildConfig.VERSION_NAME}")
+            }
+            try {
+                when (con.responseCode) {
+                    200 -> {}
+                    403, 429 -> return@withContext Resultado.Erro("o GitHub limitou os pedidos; tenta daqui a uns minutos")
+                    else -> return@withContext Resultado.Erro("o GitHub respondeu ${con.responseCode}")
+                }
+                val json = JSONObject(con.inputStream.bufferedReader().use { it.readText() })
+                val codigo = json.getString("tag_name").removePrefix("android-").toIntOrNull()
+                    ?: return@withContext Resultado.Erro("versão desconhecida (${json.optString("tag_name")})")
+                if (codigo <= BuildConfig.VERSION_CODE) return@withContext Resultado.EmDia
+
+                val assets = json.getJSONArray("assets")
+                val url = (0 until assets.length())
+                    .map { assets.getJSONObject(it) }
+                    .firstOrNull { it.getString("name") == NOME_APK }
+                    ?.getString("browser_download_url")
+                    ?: return@withContext Resultado.Erro("a versão $codigo ainda não tem o APK")
+                Resultado.Nova(Versao(codigo, "1.0.$codigo", url))
+            } finally {
+                con.disconnect()
+            }
+        } catch (e: Exception) {
+            Resultado.Erro("sem ligação à Internet (${e.javaClass.simpleName})")
         }
     }
 
-    /**
-     * Procura, descarrega e instala. Seguro para chamar várias vezes:
-     * se já estiver uma atualização em curso, não faz nada.
-     */
     private var ultimaProcura = 0L
 
-    /** Versão para quando a app volta ao ecrã: no máximo uma procura a cada 10 minutos. */
+    /** Para quando a app volta ao ecrã: no máximo uma procura a cada 2 minutos. */
     suspend fun verificarSeDevido(ctx: Context) {
-        if (System.currentTimeMillis() - ultimaProcura < 10 * 60 * 1000L) return
+        if (System.currentTimeMillis() - ultimaProcura < 2 * 60 * 1000L) return
         verificarEInstalar(ctx)
     }
 
-    suspend fun verificarEInstalar(ctx: Context) {
+    /**
+     * Procura, descarrega e instala. Seguro para chamar várias vezes: se já estiver
+     * uma atualização em curso, não faz nada. Com [manual] = true mostra sempre o
+     * resultado (inclusive "já tens a versão mais recente").
+     */
+    suspend fun verificarEInstalar(ctx: Context, manual: Boolean = false) {
         if (!emCurso.tryLock()) return
         ultimaProcura = System.currentTimeMillis()
         try {
-            val nova = runCatching { procurar() }.getOrNull() ?: return
-            _estado.value = "A descarregar a versão ${nova.nome}…"
-            val apk = descarregar(ctx, nova)
-            _estado.value = "A instalar a versão ${nova.nome}…"
-            instalar(ctx, apk, nova)
+            if (manual) _estado.value = "A procurar atualizações…"
+            when (val r = procurar()) {
+                is Resultado.EmDia -> {
+                    if (manual) {
+                        _estado.value = "Já tens a versão mais recente (${BuildConfig.VERSION_NAME})"
+                        kotlinx.coroutines.delay(5000)
+                        if (_estado.value?.startsWith("Já tens") == true) _estado.value = null
+                    }
+                }
+                is Resultado.Erro -> _estado.value = "Não foi possível procurar atualizações: ${r.motivo}"
+                is Resultado.Nova -> {
+                    val nova = r.versao
+                    _estado.value = "A descarregar a versão ${nova.nome}…"
+                    val apk = descarregar(ctx, nova)
+                    _estado.value = "A instalar a versão ${nova.nome}…"
+                    instalar(ctx, apk, nova)
+                }
+            }
         } catch (e: Exception) {
             _estado.value = "Falha na atualização: ${e.message ?: e.javaClass.simpleName}"
         } finally {
