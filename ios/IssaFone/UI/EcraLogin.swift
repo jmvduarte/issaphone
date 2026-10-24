@@ -16,13 +16,13 @@ struct EcraLogin: View {
                 Section("Telefone (SIP)") {
                     TextField("Extensão", text: $c.utilizador)
                         .keyboardType(.numberPad)
-                    SecureField("Secret da extensão", text: $c.passwordSip)
+                    SecureField("Palavra-passe da extensão", text: $c.passwordSip)
                 }
                 Section {
-                    TextField("XMPP Domain (vazio = IP)", text: $c.dominioXmpp)
+                    TextField("Domínio XMPP (vazio = IP do servidor)", text: $c.dominioXmpp)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    SecureField("Password Openfire (vazio = igual ao SIP)", text: $c.passwordXmpp)
+                    SecureField("Palavra-passe do chat (vazio = a mesma da extensão)", text: $c.passwordXmpp)
                     Toggle("Exigir TLS no chat", isOn: $c.usarTls)
                 } header: {
                     Text("Chat (XMPP / Openfire)")

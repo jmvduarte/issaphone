@@ -124,7 +124,7 @@ extension XmppManager: XMPPStreamDelegate {
     }
 
     func xmppStream(_ sender: XMPPStream, didNotAuthenticate error: DDXMLElement) {
-        estado = "Utilizador ou password do chat errados"
+        estado = "Utilizador ou palavra-passe do chat errados"
     }
 
     func xmppStreamDidDisconnect(_ sender: XMPPStream, withError error: Error?) {

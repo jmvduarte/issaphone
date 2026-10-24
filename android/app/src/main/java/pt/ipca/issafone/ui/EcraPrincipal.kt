@@ -138,7 +138,7 @@ private fun PainelChamada(
                 if (c.aTocar) {
                     Button(onAtender, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) { Text("Atender") }
                 } else {
-                    OutlinedButton({ mute = onMute() }) { Text(if (mute) "Ativar micro" else "Silenciar", color = Color.White) }
+                    OutlinedButton({ mute = onMute() }) { Text(if (mute) "Ativar microfone" else "Silenciar", color = Color.White) }
                 }
                 Button(onDesligar, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))) { Text("Desligar") }
             }

@@ -42,22 +42,22 @@ fun EcraLogin(vm: AppViewModel) {
         Text("Telefone (SIP)", style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(utilizador, { utilizador = it.trim() }, label = { Text("Extensão") },
             singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(passSip, { passSip = it }, label = { Text("Secret da extensão") },
+        OutlinedTextField(passSip, { passSip = it }, label = { Text("Palavra-passe da extensão") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth())
 
         Text("Chat (XMPP / Openfire)", style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(dominio, { dominio = it.trim() },
-            label = { Text("XMPP Domain (vazio = IP)") },
+            label = { Text("Domínio XMPP (vazio = IP do servidor)") },
             singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(passXmpp, { passXmpp = it },
-            label = { Text("Password Openfire (vazio = igual ao SIP)") },
+            label = { Text("Palavra-passe do chat (vazio = a mesma da extensão)") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth())
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(tls, { tls = it })
             Spacer(Modifier.width(8.dp))
-            Text("Exigir TLS no chat (precisa de certificado válido)")
+            Text("Exigir TLS no chat (requer certificado válido)")
         }
 
         Button(

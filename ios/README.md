@@ -83,7 +83,7 @@ A estrutura é a mesma da versão Android (`SipManager`/`XmppManager`/ecrãs), o
 
 - **Segundo plano:** no iOS isto é mais restritivo do que no Android. Com a app em segundo plano ou fechada, o sistema suspende-a e deixa de receber chamadas e mensagens. Receber chamadas com a app fechada exige **CallKit + PushKit** (notificações VoIP), e isso obriga a ter um servidor de push e a conta paga da Apple. Fica como trabalho futuro.
 - Mensagens só em memória: o histórico perde-se ao fechar a app.
-- Configuração em UserDefaults; em produção, as passwords iriam para a Keychain.
+- Configuração em UserDefaults; em produção, as palavras-passe iriam para a Keychain.
 - Chat sem TLS obrigatório e aceitação do certificado autoassinado. SIP em UDP sem SRTP. Serve para laboratório, não para a Internet.
 - O XMPPFramework não tem versão oficial recente com suporte a Swift Package Manager, por isso usa-se o branch `master`.
 - O Linphone SDK é GPLv3: sem problema para uso académico.

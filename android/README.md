@@ -15,7 +15,7 @@ App Android (Kotlin + Jetpack Compose) que junta, numa só aplicação:
 
 ### 1.1 Extensões (chamadas)
 1. *PBX → PBX Configuration → Extensions → Add Extension* (tipo **SIP**, chan_sip).
-2. Define a extensão (ex.: `101`) e o **secret**. Esta é a password SIP da app.
+2. Define a extensão (ex.: `101`) e o campo **secret** (é assim que o Issabel chama à palavra-passe da extensão). É esta a palavra-passe que pões na app.
 3. Em *Device Options* deixa `nat=yes` e `qualify=yes`.
 4. Cria pelo menos duas extensões (101 e 102) para testar chamadas entre telemóveis.
 
@@ -35,7 +35,7 @@ systemctl enable --now openfire
 Depois abre `http://IP_DO_ISSABEL:9090` e conclui o assistente:
 - **XMPP Domain**: podes deixar o hostname ou usar o IP. Anota-o, porque é o campo "XMPP Domain" da app.
 - Base de dados: *Embedded Database* chega para o projeto.
-- Em *Users/Groups → Create New User*, cria utilizadores com o **mesmo nome das extensões** (101, 102…). Se usares também a mesma password do secret, na app basta preencher a password SIP.
+- Em *Users/Groups → Create New User*, cria utilizadores com o **mesmo nome das extensões** (101, 102…). Se lhes deres a mesma palavra-passe da extensão, na app basta preencher a palavra-passe da extensão.
 - (Opcional) Em *Users/Groups → Groups*, cria um grupo "Empresa", ativa *Contact List (Roster) Sharing* e mete lá todos. Assim os colegas aparecem automaticamente na lista da app.
 - Em *Server Settings → Client Connections*, mantém o STARTTLS como **opcional**. A app liga sem TLS por defeito porque o certificado do Openfire é autoassinado.
 
@@ -59,7 +59,7 @@ Em *Security → Firewall* (ou `firewall-cmd`), garante que estão abertas:
 
 ## 3. Usar
 
-1. No ecrã de entrada: IP do Issabel, extensão, secret, XMPP Domain e, se for diferente, a password do Openfire.
+1. No ecrã de entrada: IP do Issabel, extensão, palavra-passe da extensão, domínio XMPP e, se for diferente, a palavra-passe do chat (Openfire).
 2. No topo aparece o estado: *Telefone: Registado* e *Chat: Ligado como …*.
 3. **Teclado**: marca uma extensão e carrega em *Ligar*. Durante a chamada podes silenciar o micro, enviar DTMF ou desligar.
 4. **Chat**: adiciona um colega pelo número de extensão, abre a conversa e envia mensagens. O botão *Ligar* na conversa faz uma chamada SIP para a mesma extensão. É aqui que as duas partes da app se ligam.
@@ -124,6 +124,6 @@ O serviço usa o tipo `specialUse`, adequado a uma app instalada por APK. Para p
 - Não usa notificações push: a ligação permanente gasta mais bateria do que uma solução com FCM (ver secção 5).
 - As mensagens ficam só em memória. O histórico perde-se ao fechar a app (solução: Room/SQLite ou XEP-0313 MAM no Openfire).
 - As mensagens de quem não está na lista de contactos são recebidas, mas só aparecem depois de adicionares esse contacto.
-- Passwords guardadas em SharedPreferences simples (em produção: EncryptedSharedPreferences).
+- Palavras-passe guardadas em SharedPreferences simples (em produção: EncryptedSharedPreferences).
 - O chat sem TLS e o SIP em UDP sem SRTP não são cifrados. É aceitável em laboratório, mas não na Internet.
 - O Linphone SDK é GPLv3. Para uso académico não há problema; numa app comercial fechada seria preciso licença.

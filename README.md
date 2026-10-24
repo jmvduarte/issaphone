@@ -58,11 +58,11 @@ O APK de debug é assinado com uma chave temporária que muda em cada build. Na 
    - Windows (PowerShell): `[Convert]::ToBase64String([IO.File]::ReadAllBytes("issafone.jks")) > issafone.txt`
 3. No GitHub, vai a *Settings → Secrets and variables → Actions → New repository secret* e cria:
 
-| Secret | Valor |
+| Nome do secret | Valor |
 |--------|-------|
 | `ANDROID_KEYSTORE_BASE64` | conteúdo do `issafone.txt` |
-| `ANDROID_KEYSTORE_PASSWORD` | password da keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | palavra-passe da keystore |
 | `ANDROID_KEY_ALIAS` | `issafone` |
-| `ANDROID_KEY_PASSWORD` | password da chave |
+| `ANDROID_KEY_PASSWORD` | palavra-passe da chave |
 
 A partir daí, cada build gera também o `IssaFone.apk` assinado. **Nunca faças commit da `.jks`**; o `.gitignore` já a exclui.
