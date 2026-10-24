@@ -24,7 +24,8 @@ final class XmppManager: NSObject, ObservableObject {
     @Published private(set) var contactos: [Contacto] = []
 
     private let stream = XMPPStream()
-    private let rosterStorage = XMPPRosterMemoryStorage()
+    // Os inicializadores Objective-C do XMPPFramework devolvem opcionais em Swift
+    private let rosterStorage: XMPPRosterMemoryStorage = XMPPRosterMemoryStorage()!
     private lazy var roster: XMPPRoster = XMPPRoster(rosterStorage: rosterStorage)
     private let reconnect = XMPPReconnect()
 
@@ -35,11 +36,11 @@ final class XmppManager: NSObject, ObservableObject {
     override init() {
         super.init()
         stream.addDelegate(self, delegateQueue: .main)
-        rosterStorage.addDelegate(self, delegateQueue: .main)
 
         roster.autoFetchRoster = true
         roster.autoAcceptKnownPresenceSubscriptionRequests = true
         roster.activate(stream)
+        // Recebe também os eventos do armazenamento em memória (xmppRosterDidChange)
         roster.addDelegate(self, delegateQueue: .main)
         reconnect.activate(stream)
     }
@@ -70,7 +71,7 @@ final class XmppManager: NSObject, ObservableObject {
 
     func desligar() {
         guard stream.isConnected || stream.isConnecting else { return }
-        stream.send(XMPPPresence(type: .unavailable))
+        stream.send(XMPPPresence(type: "unavailable"))
         stream.disconnect()
         estado = "Desligado"
     }
