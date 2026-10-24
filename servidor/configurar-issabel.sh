@@ -326,6 +326,15 @@ echo "  (a aguardar o arranque do Openfire…)"
 for i in $(seq 1 40); do ss -tln | grep -q ":5222 " && break; sleep 2; done
 ss -tln | grep -q ":5222 " && ok "Openfire a correr (5222)" || falha "O Openfire não arrancou — vê /opt/openfire/logs/openfire.log"
 sleep 3
+# O assistente do Openfire guarda o fornecedor de autenticação na base de dados,
+# que tem prioridade sobre o openfire.xml: nesse caso é preciso mudá-lo no painel.
+if tail -n 300 /opt/openfire/logs/openfire.log | grep -q "XML Property 'provider\.\(auth\|user\|group\)\.className' differs"; then
+  falha "O Openfire ainda usa os fornecedores da base de dados. No painel (porta 9090), Servidor → Gestão do Servidor → Propriedades do Sistema, muda:"
+  echo "      provider.auth.className  = org.jivesoftware.openfire.auth.HybridAuthProvider"
+  echo "      provider.user.className  = org.jivesoftware.openfire.user.HybridUserProvider   (se existir)"
+  echo "      provider.group.className = org.jivesoftware.openfire.group.JDBCGroupProvider    (se existir)"
+  echo "      e depois: service openfire restart"
+fi
 if tail -n 200 /opt/openfire/logs/openfire.log | grep -iE "SQLException|ClassNotFound|Communications link" | tail -3 | grep -q .; then
   falha "Erros de base de dados no Openfire:"; tail -n 200 /opt/openfire/logs/openfire.log | grep -iE "SQLException|ClassNotFound|Communications link" | tail -3 | sed 's/^/      /'
 fi

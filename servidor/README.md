@@ -48,6 +48,17 @@ Antes de alterar os ficheiros originais, o script guarda uma cópia de cada um c
 
 ## Depois de correr
 
+Se o resumo indicar que o Openfire "ainda usa os fornecedores da base de dados", é porque o assistente de instalação guardou o método de autenticação na base de dados interna, e essa tem prioridade sobre o `openfire.xml`. Resolve-se no painel do Openfire, em **Servidor → Gestão do Servidor → Propriedades do Sistema**:
+
+| Propriedade | Valor |
+|---|---|
+| `provider.auth.className` | `org.jivesoftware.openfire.auth.HybridAuthProvider` |
+| `provider.user.className` (se existir) | `org.jivesoftware.openfire.user.HybridUserProvider` |
+| `provider.group.className` (se existir) | `org.jivesoftware.openfire.group.JDBCGroupProvider` |
+
+Depois corre `service openfire restart`. Para confirmar, vê se as extensões aparecem em *Utilizadores/Grupos → Utilizadores*.
+
+
 Só falta um passo manual: no Openfire, em **Utilizadores/Grupos → Grupos → IssaFone**, ativa **Partilha da lista de contactos**. A partir daí, cada extensão vê todas as outras na lista de contactos, sem ter de as adicionar.
 
 A conta de administrador do Openfire, criada no assistente, continua a funcionar, porque a autenticação é híbrida: primeiro as extensões, depois as contas locais.
