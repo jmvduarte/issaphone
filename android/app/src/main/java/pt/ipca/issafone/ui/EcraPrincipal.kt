@@ -406,6 +406,7 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
     val msgs = todas.filter { it.contacto.equals(jid, ignoreCase = true) }
     var texto by remember { mutableStateOf("") }
     var verMembros by remember { mutableStateOf(false) }
+    var confirmarRemover by remember { mutableStateOf(false) }
     val lista = rememberLazyListState()
     val hora = remember { SimpleDateFormat("HH:mm", Locale("pt", "PT")) }
     LaunchedEffect(msgs.size) { if (msgs.isNotEmpty()) lista.animateScrollToItem(msgs.lastIndex) }
@@ -424,6 +425,16 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
                 Button(onClick = { onLigar(jid, false) }, colors = ButtonDefaults.buttonColors(containerColor = Verde)) { Text("Ligar") }
                 Spacer(Modifier.width(6.dp))
                 Button(onClick = { onLigar(jid, true) }, colors = ButtonDefaults.buttonColors(containerColor = Azul)) { Text("Vídeo") }
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { menu = true }) { Text("⋮", fontSize = 20.sp) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Remover contacto", color = Vermelho) },
+                            onClick = { menu = false; confirmarRemover = true }
+                        )
+                    }
+                }
             }
         }
         LazyColumn(Modifier.weight(1f).padding(horizontal = 12.dp), state = lista) {
@@ -454,6 +465,18 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
     }
 
     if (verMembros && grupo != null) DialogoMembros(vm, grupo, onFechar = { verMembros = false }, onSaiu = onVoltar)
+    if (confirmarRemover) AlertDialog(
+        onDismissRequest = { confirmarRemover = false },
+        title = { Text("Remover contacto") },
+        text = { Text("Remover ${vm.xmpp.nomeDe(jid)} dos contactos? A conversa também é apagada.") },
+        confirmButton = {
+            Button(onClick = {
+                confirmarRemover = false
+                vm.removerContacto(jid) { ok -> if (ok) onVoltar() }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Vermelho)) { Text("Remover") }
+        },
+        dismissButton = { TextButton(onClick = { confirmarRemover = false }) { Text("Cancelar") } }
+    )
 }
 
 @Composable

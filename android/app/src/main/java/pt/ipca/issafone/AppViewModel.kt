@@ -63,6 +63,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun enviar(destino: String, texto: String) = viewModelScope.launch { xmpp.enviar(destino, texto) }
     fun adicionarContacto(u: String) = viewModelScope.launch { xmpp.adicionarContacto(u) }
+    fun removerContacto(jid: String, depois: (Boolean) -> Unit) =
+        viewModelScope.launch { depois(xmpp.removerContacto(jid)) }
 
     // Grupos
     fun criarGrupo(nome: String, membros: List<String>, depois: (String?) -> Unit) =

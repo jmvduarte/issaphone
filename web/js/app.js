@@ -404,6 +404,15 @@ const Xmpp = {
     return true;
   },
 
+  /** Remove um contacto da lista (os do grupo partilhado não podem ser removidos). */
+  remover(jid) {
+    this.con.sendIQ(
+      $iq({ type: 'set' }).c('query', { xmlns: NS.ROSTER }).c('item', { jid, subscription: 'remove' }),
+      () => { this.contactos.delete(jid); Historico.apagar(jid); UI.fecharConversa(); UI.contactos(); },
+      () => UI.aviso('Este contacto vem do grupo partilhado do Openfire e não pode ser removido daqui.')
+    );
+  },
+
   adicionar(utilizador) {
     const jid = this.jid(utilizador.trim());
     this.con.sendIQ($iq({ type: 'set' }).c('query', { xmlns: NS.ROSTER }).c('item', { jid }));
@@ -702,6 +711,7 @@ const UI = {
     $('#btn-ligar-contacto').hidden = grupo;
     $('#btn-video-contacto').hidden = grupo;
     $('#btn-membros').hidden = !grupo;
+    $('#btn-remover-contacto').hidden = grupo;
     $('#form-mensagem').hidden = false;
     this.mensagens();
     this.contactos();
@@ -712,7 +722,7 @@ const UI = {
   fecharConversa() {
     this.conversaCom = null;
     $('#conversa-nome').textContent = 'Escolhe um contacto';
-    ['#btn-ligar-contacto', '#btn-video-contacto', '#btn-membros', '#form-mensagem'].forEach((s) => { $(s).hidden = true; });
+    ['#btn-ligar-contacto', '#btn-video-contacto', '#btn-membros', '#btn-remover-contacto', '#form-mensagem'].forEach((s) => { $(s).hidden = true; });
     $('#mensagens').replaceChildren();
     $('#modal-membros').hidden = true;
     if ($('.corpo').dataset.vista === 'conversa') this.vista('contactos');
@@ -959,6 +969,11 @@ function ligarEventos() {
 
   $('#btn-ligar-contacto').onclick = () => { if (UI.conversaCom) Sip.chamar(UI.conversaCom.split('@')[0]); };
   $('#btn-video-contacto').onclick = () => { if (UI.conversaCom) Sip.chamar(UI.conversaCom.split('@')[0], true); };
+
+  $('#btn-remover-contacto').onclick = () => {
+    const jid = UI.conversaCom;
+    if (jid && confirm(`Remover ${UI.nomeDe(jid)} dos contactos? A conversa também é apagada.`)) Xmpp.remover(jid);
+  };
 
   // Grupos
   $('#btn-novo-grupo').onclick = () => UI.abrirNovoGrupo();

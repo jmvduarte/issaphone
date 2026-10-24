@@ -209,6 +209,23 @@ class XmppManager(context: Context) {
         }
     }
 
+    /** Remove um contacto. Devolve false se não for possível (ex.: vem do grupo partilhado). */
+    suspend fun removerContacto(jid: String): Boolean = withContext(Dispatchers.IO) {
+        val con = ligacao ?: return@withContext false
+        try {
+            val roster = Roster.getInstanceFor(con)
+            val entrada = roster.getEntry(JidCreate.entityBareFrom(jid)) ?: return@withContext false
+            roster.removeEntry(entrada)
+            _mensagens.update { lista -> lista.filter { it.contacto != jid } }
+            gravarHistorico()
+            atualizarContactos()
+            true
+        } catch (e: Exception) {
+            _aviso.value = "Este contacto vem do grupo partilhado do Openfire e não pode ser removido daqui."
+            false
+        }
+    }
+
     /** Adiciona um colega à lista de contactos (pede subscrição de presença). */
     suspend fun adicionarContacto(utilizador: String) = withContext(Dispatchers.IO) {
         val con = ligacao ?: return@withContext
