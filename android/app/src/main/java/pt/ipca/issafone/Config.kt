@@ -9,7 +9,7 @@ data class Config(
     val passwordSip: String = "",    // "secret" da extensão
     val dominioXmpp: String = "",    // XMPP Domain do Openfire
     val passwordXmpp: String = "",   // password do utilizador no Openfire
-    val usarTls: Boolean = false
+    val usarTls: Boolean = true
 ) {
     val valida get() = servidor.isNotBlank() && utilizador.isNotBlank() && passwordSip.isNotBlank()
 }
@@ -23,12 +23,13 @@ object ConfigStore {
 
     fun carregar(ctx: Context): Config = with(prefs(ctx)) {
         Config(
-            servidor = getString("servidor", "") ?: "",
+            servidor = getString("servidor", null)?.ifBlank { null } ?: BuildConfig.SERVIDOR_PADRAO,
             utilizador = getString("utilizador", "") ?: "",
             passwordSip = getString("passwordSip", "") ?: "",
             dominioXmpp = getString("dominioXmpp", "") ?: "",
             passwordXmpp = getString("passwordXmpp", "") ?: "",
-            usarTls = getBoolean("usarTls", false)
+            // O Openfire tem certificado Let's Encrypt: o chat vai cifrado por omissão
+            usarTls = getBoolean("usarTls", true)
         )
     }
 

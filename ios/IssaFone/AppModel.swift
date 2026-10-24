@@ -1,14 +1,17 @@
 import Foundation
 import AVFoundation
 
+/// Servidor Issabel pré-configurado: o ecrã de entrada só pede extensão e palavra-passe.
+let servidorPadrao = "rsi-a36357.ddns.net"
+
 /// Dados de ligação ao Issabel. O mesmo utilizador serve SIP e XMPP.
 struct Config: Codable, Equatable {
-    var servidor = ""       // IP do Issabel
+    var servidor = servidorPadrao  // domínio do Issabel
     var utilizador = ""     // extensão, ex.: 101
     var passwordSip = ""    // "secret" da extensão
     var dominioXmpp = ""    // XMPP Domain do Openfire
     var passwordXmpp = ""   // password no Openfire (vazio = igual ao SIP)
-    var usarTls = false
+    var usarTls = true      // o Openfire tem certificado Let's Encrypt
 }
 
 @MainActor
@@ -26,7 +29,8 @@ final class AppModel: ObservableObject {
         // Nota: UserDefaults é aceitável num projeto académico;
         // em produção as passwords devem ir para a Keychain.
         if let data = UserDefaults.standard.data(forKey: chave),
-           let c = try? JSONDecoder().decode(Config.self, from: data) {
+           var c = try? JSONDecoder().decode(Config.self, from: data) {
+            if c.servidor.isEmpty { c.servidor = servidorPadrao }
             config = c
         } else {
             config = Config()

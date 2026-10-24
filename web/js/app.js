@@ -12,11 +12,17 @@ const $ = (s) => document.querySelector(s);
 const CHAVE_CONFIG = 'issafone.config';
 let cfg = null;
 
+// Servidor pré-configurado. Se a webapp estiver alojada no próprio Issabel
+// (https://dominio/issafone/), usa o domínio da página.
+const SERVIDOR_PROJETO = 'rsi-a36357.ddns.net';
+const SERVIDOR_PADRAO = /(^localhost$|^127\.|github\.io$)/.test(location.hostname)
+  ? SERVIDOR_PROJETO : location.hostname;
+
 const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* modo privado */ } };
 const ler = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 
 function completarConfig(c) {
-  const host = c.servidor.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const host = ((c.servidor || '').trim() || SERVIDOR_PADRAO).replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   return {
     ...c,
     servidor: host,
@@ -575,6 +581,7 @@ function mostrarLogin(c) {
   $('#ecra-app').hidden = true;
   $('#ecra-login').hidden = false;
   const f = $('#form-login');
+  f.elements.servidor.value = SERVIDOR_PADRAO;
   if (c) for (const [k, v] of Object.entries(c)) if (f.elements[k] && typeof v === 'string') f.elements[k].value = v;
   const erro = verificarRequisitos();
   $('#erro-login').hidden = !erro;

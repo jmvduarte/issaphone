@@ -20,6 +20,9 @@ android {
 
         // Repositório onde a app procura atualizações (Releases "android-N")
         buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issaphone\"")
+
+        // Servidor Issabel pré-configurado: o ecrã de entrada só pede extensão e palavra-passe
+        buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
     }
 
     buildFeatures {

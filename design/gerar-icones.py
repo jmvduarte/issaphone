@@ -110,6 +110,9 @@ def main():
         mono.putalpha(ImageChops.subtract(a, b))
         guardar(mono, pasta / "ic_launcher_monochrome.png")
 
+    # Logótipo para o ecrã de entrada da app Android
+    guardar(render(completo, 384), res / "drawable-nodpi" / "logo_issafone.png")
+
     # ---------- Webapp (PWA) ----------
     print("Webapp")
     web = RAIZ / "web/icons"

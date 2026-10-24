@@ -27,39 +27,26 @@
       </div>
     </div>
 
-    <fieldset>
-      <legend>Servidor</legend>
-      <label>Domínio do Issabel
-        <input name="servidor" required placeholder="pbx.exemplo.pt" autocapitalize="off" spellcheck="false">
+    <label>Extensão
+      <input name="extensao" required inputmode="numeric" placeholder="201" autocomplete="username">
+    </label>
+    <label>Palavra-passe
+      <input name="passSip" type="password" required autocomplete="current-password">
+    </label>
+
+    <details class="avancado">
+      <summary>Opções avançadas</summary>
+      <label>Servidor
+        <input name="servidor" autocapitalize="off" spellcheck="false">
       </label>
-    </fieldset>
-
-    <fieldset>
-      <legend>Telefone (SIP por WebRTC)</legend>
-      <div class="linha">
-        <label>Extensão
-          <input name="extensao" required inputmode="numeric" placeholder="201" autocomplete="username">
-        </label>
-        <label>Palavra-passe da extensão
-          <input name="passSip" type="password" required autocomplete="current-password">
-        </label>
-      </div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Chat (XMPP / Openfire)</legend>
       <div class="linha">
         <label>Domínio XMPP
           <input name="dominioXmpp" placeholder="igual ao servidor" autocapitalize="off" spellcheck="false">
         </label>
         <label>Palavra-passe do chat
-          <input name="passXmpp" type="password" placeholder="a mesma da extensão">
+          <input name="passXmpp" type="password" placeholder="a mesma">
         </label>
       </div>
-    </fieldset>
-
-    <details class="avancado">
-      <summary>Opções avançadas</summary>
       <label>Endereço WebSocket SIP
         <input name="wsSip" placeholder="wss://servidor:8089/ws" autocapitalize="off" spellcheck="false">
       </label>

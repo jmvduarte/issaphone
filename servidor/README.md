@@ -1,0 +1,44 @@
+# Configuração do servidor Issabel
+
+`configurar-issabel.sh` prepara um Issabel 4 (CentOS 7) com Asterisk 16 e Openfire 4.9 para o IssaFone. Está configurado para o domínio `rsi-a36357.ddns.net`.
+
+## Antes de correr
+
+1. O Openfire tem de estar instalado e o assistente da porta 9090 concluído, com o *XMPP Domain* igual ao domínio.
+2. No router, redireciona para o IP do Issabel:
+   - TCP 80, 443, 5222, 7443 e 8089;
+   - UDP 5060 e 10000-20000.
+
+   A porta 80 é obrigatória para o Let's Encrypt.
+3. Cria no Issabel as extensões SIP da webapp (por omissão 201–210). As do Android podem ser quaisquer outras.
+
+## Correr (como root)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jmvduarte/issaphone/main/servidor/configurar-issabel.sh -o configurar-issabel.sh
+bash configurar-issabel.sh
+```
+
+Para usar outras extensões web: `EXT_WEB=301-305 bash configurar-issabel.sh`.
+
+Podes voltar a correr o script sempre que quiseres. Por exemplo, depois de criares novas extensões web, corre-o outra vez para lhes aplicar as opções WebRTC.
+
+## O que faz
+
+| Passo | Resultado |
+|-------|-----------|
+| Let's Encrypt | Certificado para o domínio, renovado automaticamente. Em cada renovação, é copiado para o Asterisk e o Openfire |
+| Apache | HTTPS com o certificado válido |
+| Asterisk | WebSocket seguro na porta 8089 (`http.conf`) |
+| Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf` |
+| Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
+| Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
+| Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` |
+
+Antes de alterar os ficheiros originais, o script guarda uma cópia de cada um com o sufixo `.antes-issafone`.
+
+## Depois de correr
+
+Só falta um passo manual: no Openfire, em **Utilizadores/Grupos → Grupos → IssaFone**, ativa **Partilha da lista de contactos**. A partir daí, cada extensão vê todas as outras na lista de contactos, sem ter de as adicionar.
+
+A conta de administrador do Openfire, criada no assistente, continua a funcionar, porque a autenticação é híbrida: primeiro as extensões, depois as contas locais.
