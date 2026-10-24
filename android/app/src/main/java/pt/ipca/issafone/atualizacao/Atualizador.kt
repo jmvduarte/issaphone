@@ -73,8 +73,17 @@ object Atualizador {
      * Procura, descarrega e instala. Seguro para chamar várias vezes:
      * se já estiver uma atualização em curso, não faz nada.
      */
+    private var ultimaProcura = 0L
+
+    /** Versão para quando a app volta ao ecrã: no máximo uma procura a cada 10 minutos. */
+    suspend fun verificarSeDevido(ctx: Context) {
+        if (System.currentTimeMillis() - ultimaProcura < 10 * 60 * 1000L) return
+        verificarEInstalar(ctx)
+    }
+
     suspend fun verificarEInstalar(ctx: Context) {
         if (!emCurso.tryLock()) return
+        ultimaProcura = System.currentTimeMillis()
         try {
             val nova = runCatching { procurar() }.getOrNull() ?: return
             _estado.value = "A descarregar a versão ${nova.nome}…"

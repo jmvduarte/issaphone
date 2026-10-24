@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.launch
 import org.linphone.mediastream.video.capture.CaptureTextureView
 import pt.ipca.issafone.AppViewModel
 import pt.ipca.issafone.sip.CallUi
@@ -53,6 +54,13 @@ fun EcraPrincipal(vm: AppViewModel) {
     val pedido by vm.abrirConversa.collectAsState()
     LaunchedEffect(pedido) {
         pedido?.let { tab = 1; conversaCom = it; vm.pedirConversa(null) }
+    }
+    // Sempre que a app volta ao ecrã, procura atualizações (no máximo de 10 em 10 min)
+    val escopo = rememberCoroutineScope()
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        val c = vm.sip.chamada.value
+        if (!c.ativa && !c.aTocar) escopo.launch { pt.ipca.issafone.atualizacao.Atualizador.verificarSeDevido(ctx) }
+        onPauseOrDispose { }
     }
     LaunchedEffect(aviso) {
         aviso?.let { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show(); vm.xmpp.limparAviso() }

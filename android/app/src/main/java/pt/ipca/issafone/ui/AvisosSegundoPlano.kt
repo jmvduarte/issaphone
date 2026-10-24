@@ -48,6 +48,13 @@ private fun avisosPendentes(ctx: Context): List<Aviso> = buildList {
         "Ecrã de chamada",
         Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkg)
     ))
+
+    // Sem isto, as atualizações automáticas ficam a meio ("Atualização cancelada")
+    if (!ctx.packageManager.canRequestPackageInstalls()) add(Aviso(
+        "Para a app se atualizar sozinha, autoriza o IssaFone a instalar apps.",
+        "Permitir atualizações",
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, pkg)
+    ))
 }
 
 /** Cartão no topo do ecrã principal; desaparece quando está tudo autorizado. */
@@ -68,7 +75,7 @@ fun AvisosSegundoPlano() {
         modifier = Modifier.fillMaxWidth().padding(8.dp)
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Para tocar com a app fechada", style = MaterialTheme.typography.titleSmall)
+            Text("Falta autorizar", style = MaterialTheme.typography.titleSmall)
             avisos.forEach { a ->
                 Text(a.texto, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(onClick = {
