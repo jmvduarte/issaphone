@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import pt.ipca.issafone.MainActivity
+import pt.ipca.issafone.R
 
 object Notificacoes {
 
@@ -61,7 +62,7 @@ object Notificacoes {
 
     fun servico(ctx: Context, estado: String): Notification =
         NotificationCompat.Builder(ctx, CANAL_SERVICO)
-            .setSmallIcon(android.R.drawable.stat_sys_phone_call)
+            .setSmallIcon(R.drawable.ic_stat_issafone)
             .setContentTitle("IssaFone ativo")
             .setContentText(estado)
             .setContentIntent(abrirApp(ctx, 10))
@@ -100,7 +101,7 @@ object Notificacoes {
     fun mensagem(ctx: Context, de: String, texto: String) {
         val nome = de.substringBefore("@")
         val n = NotificationCompat.Builder(ctx, CANAL_MENSAGENS)
-            .setSmallIcon(android.R.drawable.sym_action_chat)
+            .setSmallIcon(R.drawable.ic_stat_issafone)
             .setContentTitle(nome)
             .setContentText(texto)
             .setStyle(NotificationCompat.BigTextStyle().bigText(texto))

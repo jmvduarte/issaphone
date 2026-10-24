@@ -1,3 +1,5 @@
+<p align="center"><img src="design/previa.png" alt="Ícone do IssaFone" width="420"></p>
+
 # IssaFone
 
 Softphone com chat interno para o **Issabel 4**, com versões **Android** e **iOS**.
@@ -66,3 +68,13 @@ O APK de debug é assinado com uma chave temporária que muda em cada build. Na 
 | `ANDROID_KEY_PASSWORD` | palavra-passe da chave |
 
 A partir daí, cada build gera também o `IssaFone.apk` assinado. **Nunca faças commit da `.jks`**; o `.gitignore` já a exclui.
+
+## Ícone
+
+O ícone é gerado a partir de um único desenho por `design/gerar-icones.py`: um balão de conversa (o chat) com um auscultador (as chamadas). O script produz o ícone adaptativo do Android, incluindo a versão monocromática para os ícones temáticos do Android 13+, e o ícone de 1024 px do iOS. Para mudar as cores, altera `C1`/`C2` no script e corre:
+
+```bash
+pip install cairosvg pillow
+python3 design/gerar-icones.py
+```
+
