@@ -221,3 +221,64 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--texto-2); }
   .corpo .painel { display: flex !important; }
   .teclado { border-left: 1px solid var(--linha); }
 }
+
+/* ---------- Grupos ---------- */
+.secao {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 4px; font-size: 12px; font-weight: 700;
+  color: var(--texto-2); text-transform: uppercase; letter-spacing: .05em;
+}
+.pequeno { font-size: 13px; }
+.discreto.pequeno { padding: 4px 8px; color: var(--azul); text-transform: none; letter-spacing: 0; }
+.vazio.pequeno { padding: 6px 14px 10px; text-align: left; font-size: 13px; }
+.lista { list-style: none; margin: 0; padding: 0; }
+.contactos { overflow-y: auto; }
+#lista-contactos, #lista-grupos { overflow: visible; }
+#lista-grupos li button {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--linha);
+}
+#lista-grupos li button:hover, #lista-grupos li button.ativo { background: var(--superficie-2); }
+.iniciais.grupo { border-radius: 12px; }
+.iniciais.grupo::after { display: none; }
+#mensagens li .autor { display: block; font-size: 12px; font-weight: 700; color: var(--azul); margin-bottom: 2px; }
+#mensagens li.minha .autor { display: none; }
+.perigo { color: var(--erro) !important; }
+
+.modal {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgb(10 14 22 / .55);
+  display: grid; place-items: center; padding: 16px;
+}
+.modal-cartao { max-height: 90vh; overflow-y: auto; }
+.modal-cartao h2 { margin: 0; font-size: 20px; }
+.escolher { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow-y: auto; border: 1px solid var(--linha); border-radius: 10px; }
+.escolher li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--linha); }
+.escolher li:last-child { border-bottom: 0; }
+.escolher label { display: flex; align-items: center; gap: 10px; color: var(--texto); font-size: 15px; flex: 1; cursor: pointer; }
+.escolher input[type=checkbox] { width: 18px; height: 18px; }
+.escolher .papel { margin-left: auto; font-size: 12px; color: var(--texto-2); }
+.escolher button { margin-left: 8px; }
+.adicionar-membro { display: flex; gap: 8px; }
+.adicionar-membro select {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--linha);
+  background: var(--superficie); color: var(--texto); font: inherit;
+}
+.botoes-modal { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Videochamadas ---------- */
+.ligar-pequeno.video { background: var(--azul); }
+.video-teclado { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; color: var(--azul); }
+.videos { position: absolute; inset: 0; background: #000; }
+.videos video { display: block; }
+#video-remoto { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#video-local {
+  position: absolute; right: 16px; top: max(16px, env(safe-area-inset-top));
+  width: 28%; max-width: 220px; aspect-ratio: 3 / 4; object-fit: cover;
+  border-radius: 14px; border: 2px solid rgb(255 255 255 / .6); background: #222;
+  transform: scaleX(-1);
+}
+.chamada.com-video { place-items: end center; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.chamada.com-video .chamada-cartao { position: relative; background: rgb(0 0 0 / .45); padding: 14px 18px; border-radius: 20px; }
+.chamada.com-video .avatar, .chamada.com-video h2 { display: none; }
+.chamada.com-video .chamada-botoes { margin-top: 10px; }

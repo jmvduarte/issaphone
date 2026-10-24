@@ -64,6 +64,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun enviar(destino: String, texto: String) = viewModelScope.launch { xmpp.enviar(destino, texto) }
     fun adicionarContacto(u: String) = viewModelScope.launch { xmpp.adicionarContacto(u) }
 
+    // Grupos
+    fun criarGrupo(nome: String, membros: List<String>, depois: (String?) -> Unit) =
+        viewModelScope.launch { depois(xmpp.criarGrupo(nome, membros)) }
+    suspend fun membros(jid: String) = xmpp.membros(jid)
+    fun adicionarMembro(jid: String, membro: String) = viewModelScope.launch { xmpp.adicionarMembro(jid, membro) }
+    fun removerMembro(jid: String, membro: String) = viewModelScope.launch { xmpp.removerMembro(jid, membro) }
+    fun sairGrupo(jid: String) = viewModelScope.launch { xmpp.sairGrupo(jid) }
+    fun apagarGrupo(jid: String) = viewModelScope.launch { xmpp.apagarGrupo(jid) }
+
     // Atenção: não desligar nada em onCleared() — a sessão pertence ao serviço,
     // não ao ecrã. É isso que permite receber chamadas com a app fechada.
 }

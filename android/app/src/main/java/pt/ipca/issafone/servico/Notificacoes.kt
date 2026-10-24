@@ -76,7 +76,7 @@ object Notificacoes {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
 
-    fun chamadaRecebida(ctx: Context, remoto: String) {
+    fun chamadaRecebida(ctx: Context, remoto: String, video: Boolean = false) {
         val pessoa = Person.Builder().setName(remoto).setImportant(true).build()
         val recusar = PendingIntent.getBroadcast(
             ctx, 20,
@@ -88,7 +88,7 @@ object Notificacoes {
 
         val n = NotificationCompat.Builder(ctx, CANAL_CHAMADAS)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setContentTitle("Chamada de $remoto")
+            .setContentTitle((if (video) "Videochamada de " else "Chamada de ") + remoto)
             .setContentText("IssaFone")
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(pessoa, recusar, atender))
             .setCategory(NotificationCompat.CATEGORY_CALL)
@@ -103,8 +103,9 @@ object Notificacoes {
 
     fun cancelarChamada(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_CHAMADA)
 
-    fun mensagem(ctx: Context, de: String, texto: String) {
-        val nome = de.substringBefore("@")
+    /** [de] = JID da conversa (contacto ou grupo); [titulo] = nome a mostrar. */
+    fun mensagem(ctx: Context, de: String, titulo: String, texto: String) {
+        val nome = titulo
         val n = NotificationCompat.Builder(ctx, CANAL_MENSAGENS)
             .setSmallIcon(R.drawable.ic_stat_issafone)
             .setContentTitle(nome)

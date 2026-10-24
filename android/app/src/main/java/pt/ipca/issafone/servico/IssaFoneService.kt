@@ -75,19 +75,25 @@ class IssaFoneService : Service() {
 
     private fun observarChamadas() = scope.launch {
         app.sip.chamada.collect { c ->
-            if (c.aTocar) Notificacoes.chamadaRecebida(this@IssaFoneService, c.remoto)
+            if (c.aTocar) Notificacoes.chamadaRecebida(this@IssaFoneService, c.remoto, c.ofereceVideo)
             else Notificacoes.cancelarChamada(this@IssaFoneService)
         }
     }
 
-    /** Notifica mensagens novas só quando a app não está visível. */
+    /**
+     * Notifica mensagens novas só quando a app não está visível. Não notifica as
+     * próprias nem o histórico que os grupos reenviam ao entrar.
+     */
     private fun observarMensagens() = scope.launch {
-        var vistas = app.xmpp.mensagens.value.size
+        var vistas = app.xmpp.mensagens.value.toSet()
         app.xmpp.mensagens.collect { lista ->
-            val novas = lista.drop(vistas).filter { !it.enviada }
-            vistas = lista.size
+            val novas = lista.filter { it !in vistas && !it.enviada && !it.historico }
+            vistas = lista.toSet()
             val visivel = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
-            if (!visivel) novas.forEach { Notificacoes.mensagem(this@IssaFoneService, it.contacto, it.texto) }
+            if (!visivel) novas.forEach {
+                val texto = it.autor?.let { a -> "$a: ${it.texto}" } ?: it.texto
+                Notificacoes.mensagem(this@IssaFoneService, it.contacto, app.xmpp.nomeDe(it.contacto), texto)
+            }
         }
     }
 

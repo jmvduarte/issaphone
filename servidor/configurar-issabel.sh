@@ -164,6 +164,25 @@ for m in res_http_websocket res_srtp res_crypto; do
 done
 
 # -----------------------------------------------------------------------------
+passo "5b. Videochamadas (VP8 e H.264)"
+# O Asterisk não converte vídeo: só o reencaminha. VP8 e H.264 são suportados
+# pela Linphone (apps) e pelos browsers (webapp), por isso todos falam o mesmo.
+GEN=/etc/asterisk/sip_general_custom.conf
+touch "$GEN"; copia "$GEN"
+sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$GEN"
+cat >> "$GEN" <<'EOF'
+; >>> IssaFone — videochamadas (gerado pelo configurar-issabel.sh)
+videosupport=yes
+allow=vp8
+allow=h264
+; <<< IssaFone
+EOF
+grep -q "sip_general_custom.conf" /etc/asterisk/sip.conf || aviso "O sip.conf não inclui o sip_general_custom.conf — o vídeo pode ficar desligado"
+asterisk -rx "sip reload" >/dev/null; sleep 1
+if asterisk -rx "sip show settings" | grep -iE "Videosupport:\s*Yes" >/dev/null; then ok "Vídeo ativo no Asterisk (VP8, H.264)"
+else falha "O Asterisk não ativou o vídeo (vê: asterisk -rx 'sip show settings' | grep -i video)"; fi
+
+# -----------------------------------------------------------------------------
 passo "6. Extensões da webapp com WebRTC ($EXT_WEB)"
 # As opções WebRTC só podem ser acrescentadas a extensões que existem: um bloco
 # "[205](+)" para uma extensão inexistente faz falhar o sip.conf inteiro.
@@ -197,7 +216,7 @@ novo=$(
     printf '%s\n' "[$e](+)" transport=wss,ws,udp avpf=yes force_avp=yes icesupport=yes encryption=yes \
       dtlsenable=yes dtlsverify=no dtlscertfile=/etc/asterisk/keys/fullchain.pem \
       dtlsprivatekey=/etc/asterisk/keys/privkey.pem dtlssetup=actpass rtcp_mux=yes \
-      nat=force_rport,comedia disallow=all allow=ulaw,alaw,opus ""
+      nat=force_rport,comedia disallow=all allow=ulaw,alaw,opus,vp8,h264 ""
   done
   echo "; <<< IssaFone"
 )
