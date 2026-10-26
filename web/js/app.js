@@ -344,6 +344,16 @@ const Sip = {
     UI.fecharChamada(texto);
   },
 
+  /** Ao voltar à página: se a ligação morreu enquanto estava em segundo plano, liga já (sem esperar pelo próximo intervalo). */
+  reavivar() {
+    if (!this.ua || this.sessao) return;
+    if (this.ua.isConnected()) { if (!this.ua.isRegistered()) this.ua.register(); return; }
+    const antigo = this.ua;
+    antigo.removeAllListeners();
+    try { antigo.stop(); } catch { /* ignora */ }
+    this.ligar();
+  },
+
   sair() {
     try { this.sessao?.terminate(); } catch { /* ignora */ }
     try { this.ua?.stop(); } catch { /* ignora */ }
@@ -373,7 +383,17 @@ const Xmpp = {
   get alcunha() { return cfg.extensao; },
   ehGrupo(jid) { return this.grupos.has(jid) || jid.endsWith('@' + this.servicoGrupos); },
 
+  /** Ao voltar à página: se o chat caiu em segundo plano, liga já em vez de esperar pela próxima tentativa. */
+  reavivar() {
+    if (this.manual || !cfg) return;
+    if (this.con?.connected && !this.con.disconnecting) return;
+    this.tentativas = 0;
+    if (!this.jaLigou) this.url = 0;
+    this.ligar();
+  },
+
   ligar() {
+    clearTimeout(this.temporizador);
     this.manual = false;
     this.falhouAuth = false;
     const con = new Strophe.Connection(cfg.urlsXmpp[this.url % cfg.urlsXmpp.length], { protocol: 'wss' });
@@ -407,13 +427,13 @@ const Xmpp = {
       // Nunca chegou a ligar por este endereço: experimenta logo o seguinte (443 ↔ 7443)
       if (!this.jaLigou && cfg.urlsXmpp.length > 1 && this.url % cfg.urlsXmpp.length === 0) {
         this.url++;
-        setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, 500);
+        this.temporizador = setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, 500);
         return;
       }
       if (!this.jaLigou) this.url = 0;
       const espera = Math.min(60, 5 * 2 ** this.tentativas++);
       UI.estado('xmpp', 'erro', `desligado — nova tentativa em ${espera}s`);
-      setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, espera * 1000);
+      this.temporizador = setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, espera * 1000);
     }
   },
 
@@ -1244,6 +1264,12 @@ function ligarEventos() {
     Toque.desbloquear();
     entrar(completarConfig(dados));
   };
+
+  // Os telemóveis suspendem a página em segundo plano e as ligações caem: ao voltar, religa logo
+  const reavivar = () => { if (document.hidden || !cfg) return; Sip.reavivar(); Xmpp.reavivar(); };
+  document.addEventListener('visibilitychange', reavivar);
+  window.addEventListener('online', reavivar);
+  window.addEventListener('pageshow', reavivar);
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && UI.conversaCom && $('.corpo').dataset.vista !== 'teclado') {
