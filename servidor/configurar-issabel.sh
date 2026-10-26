@@ -230,16 +230,29 @@ GEN=/etc/asterisk/sip_general_custom.conf
 touch "$GEN"; copia "$GEN"
 sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$GEN"
 cat >> "$GEN" <<'EOF'
-; >>> IssaFone — videochamadas (gerado pelo configurar-issabel.sh)
+; >>> IssaFone — videochamadas e SIP cifrado (gerado pelo configurar-issabel.sh)
 videosupport=yes
 allow=vp8
 allow=h264
+; SIP sobre TLS (porta 5061) para as apps, com o certificado Let's Encrypt
+tlsenable=yes
+tlsbindaddr=0.0.0.0:5061
+tlscertfile=/etc/asterisk/keys/fullchain.pem
+tlsprivatekey=/etc/asterisk/keys/privkey.pem
+tlsclientmethod=tlsv1_2
+tlsdontverifyserver=yes
 ; <<< IssaFone
 EOF
 grep -q "sip_general_custom.conf" /etc/asterisk/sip.conf || aviso "O sip.conf não inclui o sip_general_custom.conf — o vídeo pode ficar desligado"
 asterisk -rx "sip reload" >/dev/null; sleep 1
 if asterisk -rx "sip show settings" | grep -iE "Videosupport:\s*Yes" >/dev/null; then ok "Vídeo ativo no Asterisk (VP8, H.264)"
 else falha "O Asterisk não ativou o vídeo (vê: asterisk -rx 'sip show settings' | grep -i video)"; fi
+if asterisk -rx "sip show settings" | grep -iE "TLS SIP Bind.*5061|tlsbindaddr.*5061" >/dev/null \
+   || asterisk -rx "sip show settings" | grep -iE "^\s*TLS.*Enabled|SIP over TLS:\s*Yes" >/dev/null; then
+  ok "SIP sobre TLS ativo (porta 5061)"
+else
+  aviso "Não consegui confirmar o SIP sobre TLS (vê: asterisk -rx 'sip show settings' | grep -i tls)"
+fi
 
 # -----------------------------------------------------------------------------
 passo "6. Extensões da webapp com WebRTC ($EXT_WEB)"
@@ -269,13 +282,19 @@ expandir() {
   echo "${r[@]}"
 }
 novo=$(
-  echo "; >>> IssaFone — opções WebRTC (gerado automaticamente; não editar à mão)"
+  echo "; >>> IssaFone — opções WebRTC e cifra (gerado automaticamente; não editar à mão)"
   for e in $(expandir "$EXT_WEB"); do
     grep -q "^\[$e\]" "$ADD" 2>/dev/null || continue
     printf '%s\n' "[$e](+)" transport=wss,ws,udp avpf=yes force_avp=yes icesupport=yes encryption=yes \
       dtlsenable=yes dtlsverify=no dtlscertfile=/etc/asterisk/keys/fullchain.pem \
       dtlsprivatekey=/etc/asterisk/keys/privkey.pem dtlssetup=actpass rtcp_mux=yes \
       nat=force_rport,comedia qualify=yes qualifyfreq=15 disallow=all allow=ulaw,alaw,opus,vp8,h264 ""
+  done
+  # Extensões das apps (todas as que não são web): SIP sobre TLS e áudio/vídeo SRTP obrigatórios
+  web=" $(expandir "$EXT_WEB") "
+  for e in $(grep -oE '^\[[0-9]+\]' "$ADD" 2>/dev/null | tr -d '[]'); do
+    [[ $web == *" $e "* ]] && continue
+    printf '%s\n' "[$e](+)" transport=tls encryption=yes ""
   done
   echo "; <<< IssaFone"
 )
@@ -460,9 +479,10 @@ abrir -p tcp --dport 8089
 abrir -p tcp --dport 5222
 abrir -p tcp --dport 7443
 abrir -p udp --dport 5060
+abrir -p tcp --dport 5061
 abrir -p udp --dport 10000:20000
 abrir -p tcp --dport 9090 -s "$REDE_LOCAL"
-service iptables save >/dev/null 2>&1 && ok "Regras guardadas (80, 443, 8089, 5222, 7443/TCP; 5060, 10000-20000/UDP; 9090 só na rede local)" \
+service iptables save >/dev/null 2>&1 && ok "Regras guardadas (80, 443, 5061, 8089, 5222, 7443/TCP; 5060, 10000-20000/UDP; 9090 só na rede local)" \
   || aviso "Regras aplicadas mas não guardadas (service iptables save falhou)"
 aviso "Se usares o Firewall na página do Issabel, acrescenta lá as mesmas portas (ao aplicá-lo, pode substituir estas regras)"
 
@@ -557,6 +577,7 @@ verificar_tls() { # porta, nome
 }
 verificar_tls 443  "Apache / webapp"
 verificar_tls 8089 "Asterisk WSS"
+verificar_tls 5061 "Asterisk SIP/TLS (apps)"
 verificar_tls 7443 "Openfire WebSocket"
 CODE=$(curl -s --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone-push/?acao=chave")
 echo "$CODE" | grep -q '"chave":"B' && ok "Serviço de push responde" || falha "O serviço de push não responde ($CODE)"
@@ -582,7 +603,7 @@ else echo "${VERMELHO}${#FALHAS[@]} problema(s):${FIM}"; printf '  - %s\n' "${FA
 cat <<EOF
 
 No router, redireciona para $(hostname -I | awk '{print $1}'):
-  TCP 80, 443, 5222, 7443, 8089   e   UDP 5060, 10000-20000
+  TCP 80, 443, 5061, 5222, 7443, 8089   e   UDP 5060, 10000-20000
   (a webapp também funciona só com a 443, para redes que bloqueiam 8089/7443)
 
 Webapp:        https://$DOMINIO/issafone/   (extensões $EXT_WEB)

@@ -6,7 +6,7 @@
 
 1. O Openfire tem de estar instalado e o assistente da porta 9090 concluído, com o *XMPP Domain* igual ao domínio.
 2. No router, redireciona para o IP do Issabel:
-   - TCP 80, 443, 5222, 7443 e 8089;
+   - TCP 80, 443, 5061, 5222, 7443 e 8089;
    - UDP 5060 e 10000-20000.
 
    A porta 80 é obrigatória para o Let's Encrypt.
@@ -43,6 +43,7 @@ Para veres o que o serviço fez: `journalctl -t issafone`.
 | Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf`, aplicadas só às extensões que existem, e um serviço que as atualiza sozinho quando crias extensões |
 | Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
 | Notificações push | Quando ligam para uma extensão web (201–210) que não está registada, o Asterisk envia uma notificação push aos browsers dessa extensão e fica até 30 s a tocar, à espera que a webapp abra. Chaves VAPID em `/etc/issafone/`, subscrições em `/var/lib/issafone/push/`, envio por `issafone-push EXT NUMERO` |
+| Cifra | Webapp: HTTPS, WSS e DTLS-SRTP. Apps: SIP sobre TLS (porta 5061, certificado Let's Encrypt) e áudio/vídeo SRTP obrigatório em todas as extensões que não são web; chat com TLS obrigatório |
 | Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
 | Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` e atualizada sozinha a partir do GitHub (de 15 em 15 min; à mão: `issafone-atualizar-web`) |
 

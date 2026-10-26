@@ -9,6 +9,7 @@ import org.linphone.core.Call
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
 import org.linphone.core.Factory
+import org.linphone.core.MediaEncryption
 import org.linphone.core.RegistrationState
 import org.linphone.core.TransportType
 
@@ -132,14 +133,31 @@ class SipManager(context: Context) {
         core.videoPayloadTypes.forEach { it.enable(it.mimeType.uppercase() in setOf("VP8", "H264")) }
         usarCamaraFrontal()
 
+        // Cifra: áudio e vídeo SRTP obrigatórios (o servidor também os exige)
+        core.mediaEncryption = MediaEncryption.SRTP
+        core.isMediaEncryptionMandatory = true
+        // SIP sobre TLS: valida o certificado Let's Encrypt do servidor com as CAs do Android
+        carregarCAsDoSistema()?.let { core.setRootCaData(it) }
+        core.verifyServerCertificates(true)
+        core.verifyServerCn(true)
+
         core.addListener(listener)
         core.start()
     }
 
+    /** Junta os certificados de raiz do Android (inclui o ISRG Root X1 do Let's Encrypt). */
+    private fun carregarCAsDoSistema(): String? = try {
+        val bloco = Regex("-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----")
+        java.io.File("/system/etc/security/cacerts").listFiles().orEmpty()
+            .flatMap { f -> runCatching { bloco.findAll(f.readText()).map { it.value }.toList() }.getOrDefault(emptyList()) }
+            .joinToString("\n")
+            .takeIf { it.isNotEmpty() }
+    } catch (e: Exception) { null }
+
     /** Força novo registo (ex.: depois de o telemóvel mudar de rede). */
     fun refrescarRegisto() = core.refreshRegisters()
 
-    fun ligar(utilizador: String, password: String, servidor: String, porta: Int = 5060) {
+    fun ligar(utilizador: String, password: String, servidor: String, porta: Int = 5061) {
         dominio = servidor
         registoChamadas.usarConta("$utilizador@$servidor")
         // Limpa contas anteriores
@@ -150,7 +168,8 @@ class SipManager(context: Context) {
         val params = core.createAccountParams()
         params.identityAddress = factory.createAddress("sip:$utilizador@$servidor")
         val servidorAddr = factory.createAddress("sip:$servidor:$porta")
-        servidorAddr?.transport = TransportType.Udp
+        // SIP sobre TLS (porta 5061): o registo e as chamadas vão cifrados
+        servidorAddr?.transport = TransportType.Tls
         params.serverAddress = servidorAddr
         params.isRegisterEnabled = true
         // Registo curto: o Asterisk fica a saber depressa se o telemóvel saiu da rede
