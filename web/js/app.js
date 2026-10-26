@@ -84,14 +84,18 @@ const Registo = {
 
 const Tema = {
   modos: ['auto', 'claro', 'escuro'],
-  nomes: { auto: '◐ Automático', claro: '☀ Claro', escuro: '☾ Escuro' },
+  simbolos: { auto: '◐', claro: '☀', escuro: '☾' },
+  nomes: { auto: 'Automático', claro: 'Claro', escuro: 'Escuro' },
   atual() { try { return localStorage.getItem('issafone.tema') || 'auto'; } catch { return 'auto'; } },
   aplicar(modo) {
     if (modo === 'auto') delete document.documentElement.dataset.tema;
     else document.documentElement.dataset.tema = modo;
     try { localStorage.setItem('issafone.tema', modo); } catch { /* sem armazenamento */ }
     const b = $('#btn-tema');
-    if (b) { b.textContent = this.nomes[modo]; b.title = 'Tema: carrega para mudar'; }
+    if (b) {
+      b.innerHTML = `${this.simbolos[modo]}<span class="rotulo"> ${this.nomes[modo]}</span>`;
+      b.title = `Tema: ${this.nomes[modo]} (carrega para mudar)`;
+    }
   },
   seguinte() { this.aplicar(this.modos[(this.modos.indexOf(this.atual()) + 1) % 3]); },
 };
@@ -172,7 +176,13 @@ const Sip = {
     this.ua.on('disconnected', () => UI.estado('sip', 'erro', 'sem ligação (WSS 8089 e certificado?)'));
     this.ua.on('registered', () => UI.estado('sip', 'ok', 'registado'));
     this.ua.on('unregistered', () => UI.estado('sip', '', 'desligado'));
-    this.ua.on('registrationFailed', (e) => UI.estado('sip', 'erro', `falhou (${MOTIVOS[e.cause] || e.cause})`));
+    this.ua.on('registrationFailed', (e) => {
+      // No registo, "Rejected" é o 403 do Asterisk: palavra-passe errada ou extensão sem WebRTC
+      const motivo = e.cause === 'Rejected' || e.cause === 'Authentication Error'
+        ? 'recusado: palavra-passe errada ou extensão não é web (201–210)'
+        : `falhou (${MOTIVOS[e.cause] || e.cause})`;
+      UI.estado('sip', 'erro', motivo);
+    });
     this.ua.on('newRTCSession', (e) => this.novaSessao(e));
     this.ua.start();
   },
@@ -346,6 +356,7 @@ const Xmpp = {
 
   ligar() {
     this.manual = false;
+    this.falhouAuth = false;
     this.con = new Strophe.Connection(cfg.wsXmpp, { protocol: 'wss' });
     const recurso = 'web-' + Math.random().toString(36).slice(2, 7);
     this.con.connect(`${this.eu}/${recurso}`, cfg.passXmpp, (st) => this.mudouEstado(st));
@@ -355,14 +366,18 @@ const Xmpp = {
     const S = Strophe.Status;
     if (st === S.CONNECTING) UI.estado('xmpp', 'aviso', 'a ligar…');
     else if (st === S.AUTHENTICATING) UI.estado('xmpp', 'aviso', 'a autenticar…');
-    else if (st === S.AUTHFAIL) { this.manual = true; UI.estado('xmpp', 'erro', 'utilizador ou palavra-passe errados'); }
+    else if (st === S.AUTHFAIL) { this.manual = true; this.falhouAuth = true; UI.estado('xmpp', 'erro', 'palavra-passe errada'); }
     else if (st === S.CONNFAIL) UI.estado('xmpp', 'erro', 'sem ligação (WSS 7443 e certificado?)');
     else if (st === S.CONNECTED) { this.tentativas = 0; UI.estado('xmpp', 'ok', 'ligado'); this.aposLigar(); }
     else if (st === S.DISCONNECTED) {
       for (const c of this.contactos.values()) c.online = false;
       for (const g of this.grupos.values()) { g.dentro = false; g.ocupantes.clear(); }
       UI.contactos();
-      if (this.manual) { UI.estado('xmpp', '', 'desligado'); return; }
+      if (this.manual) {
+        // Não apagar a mensagem de palavra-passe errada
+        if (this.falhouAuth) this.falhouAuth = false; else UI.estado('xmpp', '', 'desligado');
+        return;
+      }
       const espera = Math.min(60, 5 * 2 ** this.tentativas++);
       UI.estado('xmpp', 'erro', `desligado — nova tentativa em ${espera}s`);
       setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, espera * 1000);
