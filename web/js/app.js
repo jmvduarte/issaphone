@@ -126,7 +126,22 @@ const Toque = {
     // Os browsers só deixam tocar som depois de um gesto do utilizador
     try { this.ctx ??= new (window.AudioContext || window.webkitAudioContext)(); this.ctx.resume(); } catch { /* sem áudio */ }
   },
+  /**
+   * iPhone: com um AudioContext ativo durante a chamada, o iOS manda o som para o auscultador
+   * (muito baixo) e pode silenciar o microfone — só funcionava com auriculares. Fecha-o antes
+   * de abrir o microfone e diz ao iOS que é uma chamada (altifalante + microfone).
+   */
+  libertar() {
+    this.parar();
+    try { this.ctx?.close(); } catch { /* ignora */ }
+    this.ctx = null;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch { /* ignora */ }
+  },
+  fimChamada() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch { /* ignora */ }
+  },
   bip() {
+    if (!this.ctx) this.desbloquear();
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     for (const freq of [440, 480]) {
@@ -303,6 +318,7 @@ const Sip = {
     if (!destino || !this.ua || this.sessao) return;
     const uri = destino.includes('@') ? `sip:${destino}` : `sip:${destino}@${cfg.servidor}`;
     this.proximaVideo = video;
+    Toque.libertar();
     try {
       this.ua.call(uri, this.opcoes(video));
     } catch (e) {
@@ -331,6 +347,10 @@ const Sip = {
       if (ligado || !pc) return;
       ligado = true;
       pc.addEventListener('track', (e) => {
+        // O som vai por um <audio> próprio (o <video> pode estar escondido e o iOS não o toca)
+        const a = $('#audio-remoto');
+        if (a.srcObject !== e.streams[0]) a.srcObject = e.streams[0];
+        a.play().catch(() => {});
         const v = $('#video-remoto');
         if (v.srcObject !== e.streams[0]) v.srcObject = e.streams[0];
         v.play().catch(() => {});
@@ -380,7 +400,7 @@ const Sip = {
     setTimeout(() => this.atualizarVideo(), 1500); // o vídeo remoto às vezes chega um pouco depois
   },
 
-  atender(video = false) { Toque.parar(); this.sessao?.answer(this.opcoes(video)); },
+  atender(video = false) { Toque.libertar(); this.sessao?.answer(this.opcoes(video)); },
   desligar() {
     if (this.info?.recebida && !this.info.atendida) this.info.recusei = true;
     try { this.sessao?.terminate(); } catch { this.fim('Chamada terminada'); }
@@ -421,6 +441,8 @@ const Sip = {
     this.inicio = null;
     this.sessao = null;
     $('#video-remoto').srcObject = null;
+    $('#audio-remoto').srcObject = null;
+    Toque.fimChamada();
     $('#video-local').srcObject = null;
     UI.videos(false);
     UI.fecharChamada(texto);
