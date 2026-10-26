@@ -564,7 +564,7 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMINIO:443:127.0.0.1"
 [ "$CODE" = 200 ] && ok "https://$DOMINIO/issafone/ responde" || falha "A webapp respondeu HTTP $CODE"
 verificar_ws() { # caminho, protocolo, nome
   local c
-  c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 --http1.1 --resolve "$DOMINIO:443:127.0.0.1" \
+  c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 --resolve "$DOMINIO:443:127.0.0.1" \
     -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
     -H "Sec-WebSocket-Key: SXNzYUZvbmVJc3NhRm9uZQ==" -H "Sec-WebSocket-Protocol: $2" "https://$DOMINIO$1")
   [ "$c" = 101 ] && ok "$3 pela porta 443 ($1)" || falha "$3 pela porta 443 não responde (HTTP $c)"
