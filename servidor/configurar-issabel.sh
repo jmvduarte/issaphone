@@ -294,7 +294,7 @@ novo=$(
   web=" $(expandir "$EXT_WEB") "
   for e in $(grep -oE '^\[[0-9]+\]' "$ADD" 2>/dev/null | tr -d '[]'); do
     [[ $web == *" $e "* ]] && continue
-    printf '%s\n' "[$e](+)" transport=tls encryption=yes ""
+    printf '%s\n' "[$e](+)" transport=tls encryption=yes nat=force_rport,comedia ""
   done
   echo "; <<< IssaFone"
 )
