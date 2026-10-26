@@ -146,6 +146,83 @@ const Toque = {
   parar() { clearInterval(this.intervalo); this.intervalo = null; },
 };
 
+/* ======================= Notificações push (chamadas com a página fechada) ======================= */
+
+const ehTelemovel = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const ehIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const instalada = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+const Push = {
+  CHAVE_CACHE: 'issafone-push',
+  urlDados: () => new URL('push-dados', location.href).href,
+  suportado: () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+  base: () => `https://${cfg.servidor}/issafone-push/`,
+
+  /** Pede ao browser uma subscrição push e regista-a no servidor (só com a permissão já dada). */
+  async ativar() {
+    if (!cfg || !this.suportado() || Notification.permission !== 'granted') return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const r = await fetch(this.base() + '?acao=chave', { cache: 'no-store' });
+      if (!r.ok) return;                       // servidor sem push instalado
+      const { chave } = await r.json();
+      const opcoes = { userVisibleOnly: true, applicationServerKey: b64urlBytes(chave) };
+      let sub = await reg.pushManager.getSubscription();
+      try { sub = sub || await reg.pushManager.subscribe(opcoes); } catch {
+        // Subscrição antiga com outra chave do servidor: troca-a
+        await sub?.unsubscribe(); sub = await reg.pushManager.subscribe(opcoes);
+      }
+      const resp = await fetch(this.base(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'subscrever', ext: cfg.extensao, pass: cfg.passSip, sub: sub.toJSON() }),
+      });
+      if (!resp.ok) return;
+      const { token } = await resp.json();
+      const c = await caches.open(this.CHAVE_CACHE);
+      await c.put(this.urlDados(), new Response(JSON.stringify({ base: this.base(), ext: cfg.extensao, token, endpoint: sub.endpoint })));
+    } catch (e) { console.warn('IssaFone push:', e); }
+  },
+
+  /** Ao sair: este aparelho deixa de receber chamadas desta extensão. */
+  async desativar() {
+    try {
+      const c = await caches.open(this.CHAVE_CACHE);
+      const r = await c.match(this.urlDados());
+      if (r) {
+        const d = await r.json();
+        fetch(d.base, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ acao: 'remover', ext: d.ext, token: d.token, endpoint: d.endpoint }),
+        }).catch(() => {});
+        await c.delete(this.urlDados());
+      }
+      const reg = await navigator.serviceWorker?.getRegistration();
+      await (await reg?.pushManager.getSubscription())?.unsubscribe();
+    } catch { /* ignora */ }
+  },
+
+  /** No iPhone, o push só existe com a webapp no ecrã principal: explica uma vez. */
+  dica() {
+    let texto = '';
+    if (ehIOS && !instalada()) texto = 'Para receberes chamadas com a página fechada: Partilhar → Adicionar ao ecrã principal, abre o IssaFone a partir daí e ativa as notificações.';
+    else if (ehTelemovel && this.suportado() && Notification.permission === 'default') texto = 'Toca no 🔔 no topo para ativar as notificações e receberes chamadas com a página fechada.';
+    const el = $('#dica');
+    if (!el) return;
+    let vista = false;
+    try { vista = localStorage.getItem('issafone.dica') === texto; } catch { /* ignora */ }
+    el.hidden = !texto || vista;
+    $('#dica-texto').textContent = texto;
+    $('#dica-fechar').onclick = () => { el.hidden = true; try { localStorage.setItem('issafone.dica', texto); } catch { /* ignora */ } };
+  },
+};
+
+function b64urlBytes(s) {
+  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+}
+
 /* ======================= Notificações do sistema ======================= */
 
 const Avisos = {
@@ -154,6 +231,8 @@ const Avisos = {
     if (!('Notification' in window)) return;
     await Notification.requestPermission();
     UI.botaoNotificacoes();
+    Push.dica();
+    Push.ativar();
   },
   mostrar(titulo, corpo, etiqueta, aoClicar) {
     if (!this.pode() || !document.hidden) return;
@@ -193,7 +272,10 @@ const Sip = {
     this.ua.on('connecting', () => UI.estado('sip', 'aviso', 'a ligar…'));
     this.ua.on('connected', () => UI.estado('sip', 'aviso', 'a registar…'));
     this.ua.on('disconnected', () => UI.estado('sip', 'erro', 'sem ligação ao servidor (portas 443/8089)'));
-    this.ua.on('registered', () => UI.estado('sip', 'ok', 'registado'));
+    this.ua.on('registered', () => {
+      UI.estado('sip', 'ok', 'registado');
+      if (!this.pushFeito) { this.pushFeito = true; Push.ativar(); }
+    });
     this.ua.on('unregistered', () => UI.estado('sip', '', 'desligado'));
     this.ua.on('registrationFailed', (e) => {
       // No registo, "Rejected" é o 403 do Asterisk: palavra-passe errada ou extensão sem WebRTC
@@ -344,10 +426,20 @@ const Sip = {
     UI.fecharChamada(texto);
   },
 
+  /**
+   * Telemóvel: ao sair da página, anula o registo. Assim o Asterisk sabe logo que tem de
+   * mandar a notificação push, em vez de tentar tocar numa página suspensa.
+   */
+  adormecer() {
+    if (!ehTelemovel || !this.ua || this.sessao) return;
+    if (!Push.suportado() || Notification.permission !== 'granted') return;
+    try { if (this.ua.isRegistered()) this.ua.unregister(); } catch { /* ignora */ }
+  },
+
   /** Ao voltar à página: se a ligação morreu enquanto estava em segundo plano, liga já (sem esperar pelo próximo intervalo). */
   reavivar() {
     if (!this.ua || this.sessao) return;
-    if (this.ua.isConnected()) { if (!this.ua.isRegistered()) this.ua.register(); return; }
+    if (this.ua.isConnected()) { this.ua.register(); return; }
     const antigo = this.ua;
     antigo.removeAllListeners();
     try { antigo.stop(); } catch { /* ignora */ }
@@ -358,6 +450,7 @@ const Sip = {
     try { this.sessao?.terminate(); } catch { /* ignora */ }
     try { this.ua?.stop(); } catch { /* ignora */ }
     this.ua = null;
+    this.pushFeito = false;
   },
 };
 
@@ -1267,6 +1360,8 @@ function ligarEventos() {
 
   // Os telemóveis suspendem a página em segundo plano e as ligações caem: ao voltar, religa logo
   const reavivar = () => { if (document.hidden || !cfg) return; Sip.reavivar(); Xmpp.reavivar(); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden && cfg) Sip.adormecer(); });
+  window.addEventListener('pagehide', () => { if (cfg) Sip.adormecer(); });
   document.addEventListener('visibilitychange', reavivar);
   window.addEventListener('online', reavivar);
   window.addEventListener('pageshow', reavivar);
@@ -1314,12 +1409,14 @@ function entrar(c) {
   UI.lista('conversas');
   UI.chamadas();
   UI.botaoNotificacoes();
+  Push.dica();
   Sip.ligar();
   Xmpp.ligar();
 }
 
 function sair() {
   if (Sip.sessao && !confirm('Estás em chamada. Sair mesmo assim?')) return;
+  Push.desativar();
   Sip.sair();
   Xmpp.sair();
   const c = lerConfigGuardada();

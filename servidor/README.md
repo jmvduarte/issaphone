@@ -42,6 +42,7 @@ Para veres o que o serviço fez: `journalctl -t issafone`.
 | WebSockets pela 443 | O Apache reencaminha `/issafone-ws/sip` (→ 8089) e `/issafone-ws/xmpp` (→ 7443). A webapp tenta primeiro a 443 e só depois as portas diretas, para funcionar em redes de empresa/escola que bloqueiam 8089 e 7443 |
 | Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf`, aplicadas só às extensões que existem, e um serviço que as atualiza sozinho quando crias extensões |
 | Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
+| Notificações push | Quando ligam para uma extensão web (201–210) que não está registada, o Asterisk envia uma notificação push aos browsers dessa extensão e fica até 30 s a tocar, à espera que a webapp abra. Chaves VAPID em `/etc/issafone/`, subscrições em `/var/lib/issafone/push/`, envio por `issafone-push EXT NUMERO` |
 | Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
 | Webapp | Instalada em `https://rsi-a36357.ddns.net/issafone/` e atualizada sozinha a partir do GitHub (de 15 em 15 min; à mão: `issafone-atualizar-web`) |
 

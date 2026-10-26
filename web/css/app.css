@@ -132,7 +132,7 @@ label { display: grid; gap: 4px; font-size: 13px; color: var(--texto-2); }
 .painel { min-width: 0; }
 html, body { overflow-x: hidden; }
 /* No telemóvel, o botão do tema mostra só o símbolo */
-@media (max-width: 600px) { #btn-tema .rotulo { display: none; } .topo #btn-tema { font-size: 22px; padding: 4px 8px; } .topo { gap: 6px; padding-left: 10px; padding-right: 10px; } }
+@media (max-width: 600px) { .topo .rotulo { display: none; } .topo #btn-notificacoes { font-size: 20px; padding: 4px 8px; } .topo #btn-tema { font-size: 22px; padding: 4px 8px; } .topo { gap: 6px; padding-left: 10px; padding-right: 10px; } }
 .painel { min-height: 0; background: var(--superficie); display: none; }
 .corpo[data-vista="teclado"] .teclado,
 .corpo[data-vista="contactos"] .contactos,
@@ -323,3 +323,15 @@ html, body { overflow-x: hidden; }
 #registo li.perdida strong { color: var(--erro); }
 #registo .rapido { padding: 8px 12px; color: var(--azul); font-size: 18px; }
 #registo .rapido:hover { background: var(--superficie-2); }
+
+/* Dica (notificações / ecrã principal) */
+.dica {
+  position: fixed; z-index: 15; left: 12px; right: 12px; bottom: calc(64px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; font-size: 13px; border-radius: 12px;
+  background: var(--superficie-2); color: var(--texto); border: 1px solid var(--linha);
+  box-shadow: 0 6px 24px rgb(0 0 0 / .25);
+}
+@media (min-width: 900px) { .dica { left: auto; right: 16px; bottom: 16px; max-width: 420px; } }
+.dica[hidden] { display: none; }
+.dica span { flex: 1; }

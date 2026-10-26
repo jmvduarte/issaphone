@@ -12,7 +12,8 @@
 #      (autentica na base de dados do Issabel: mesma palavra-passe)
 #   7. Firewall
 #   8. Instala a webapp em https://DOMINIO/issafone/
-#   9. Verificação final
+#   9. Notificações push das chamadas na webapp
+#  10. Verificação final
 #
 #  Uso (como root):
 #     curl -fsSL https://raw.githubusercontent.com/jmvduarte/issaphone/main/servidor/configurar-issabel.sh -o configurar-issabel.sh
@@ -274,7 +275,7 @@ novo=$(
     printf '%s\n' "[$e](+)" transport=wss,ws,udp avpf=yes force_avp=yes icesupport=yes encryption=yes \
       dtlsenable=yes dtlsverify=no dtlscertfile=/etc/asterisk/keys/fullchain.pem \
       dtlsprivatekey=/etc/asterisk/keys/privkey.pem dtlssetup=actpass rtcp_mux=yes \
-      nat=force_rport,comedia disallow=all allow=ulaw,alaw,opus,vp8,h264 ""
+      nat=force_rport,comedia qualify=yes qualifyfreq=15 disallow=all allow=ulaw,alaw,opus,vp8,h264 ""
   done
   echo "; <<< IssaFone"
 )
@@ -475,6 +476,77 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+passo "9b. Notificações push das chamadas (webapp com a página fechada)"
+# Os telemóveis suspendem a webapp em segundo plano. Quando alguém liga para uma
+# extensão web que não está registada, o Asterisk envia uma notificação push aos
+# browsers dessa extensão e fica a tocar até 30 s, à espera que a webapp abra e se registe.
+RAW="https://raw.githubusercontent.com/$REPO/main/servidor/push"
+APUSER=$(awk '/^User /{print $2; exit}' /etc/httpd/conf/httpd.conf 2>/dev/null); APUSER=${APUSER:-apache}
+PUSH_DIR=/var/lib/issafone/push
+if ! command -v php >/dev/null || ! command -v python >/dev/null; then
+  falha "Falta o php ou o python — notificações push não instaladas"
+else
+  mkdir -p /etc/issafone "$PUSH_DIR" /var/www/html/issafone-push
+  [ -f /etc/issafone/vapid.pem ] || openssl ecparam -name prime256v1 -genkey -noout -out /etc/issafone/vapid.pem 2>/dev/null
+  VAPID_PUB=$(openssl ec -in /etc/issafone/vapid.pem -pubout -outform DER 2>/dev/null | tail -c 65 | base64 | tr '+/' '-_' | tr -d '=\n')
+  cat > /etc/issafone/push.conf <<EOF2
+; Gerado pelo configurar-issabel.sh (IssaFone)
+dominio = "$DOMINIO"
+pasta = "$PUSH_DIR"
+chave_publica = "$VAPID_PUB"
+db_user = "openfire"
+db_pass = "$OF_DB_PASS"
+EOF2
+  # O Apache (PHP) e o Asterisk partilham a pasta das subscrições através do grupo asterisk
+  [ "$APUSER" != asterisk ] && usermod -a -G asterisk "$APUSER" 2>/dev/null
+  chown root:asterisk /etc/issafone /etc/issafone/push.conf /etc/issafone/vapid.pem
+  chmod 750 /etc/issafone; chmod 640 /etc/issafone/push.conf /etc/issafone/vapid.pem
+  chown asterisk:asterisk /var/lib/issafone "$PUSH_DIR"; chmod 2770 "$PUSH_DIR"
+  if curl -fsSL "$RAW/index.php" -o /var/www/html/issafone-push/index.php.novo \
+     && curl -fsSL "$RAW/issafone-push" -o /usr/local/sbin/issafone-push.novo; then
+    mv /var/www/html/issafone-push/index.php.novo /var/www/html/issafone-push/index.php
+    mv /usr/local/sbin/issafone-push.novo /usr/local/sbin/issafone-push; chmod 755 /usr/local/sbin/issafone-push
+    ok "Serviço de push instalado (https://$DOMINIO/issafone-push/)"
+  else
+    falha "Não foi possível descarregar os ficheiros de push do GitHub"
+  fi
+
+  # Plano de marcação: antes de tocar numa extensão web, se não estiver registada, envia o push e espera
+  EXTC=/etc/asterisk/extensions_custom.conf
+  touch "$EXTC"; copia "$EXTC"
+  sed -i '/^; >>> IssaFone push/,/^; <<< IssaFone push/d' "$EXTC"
+  {
+    echo "; >>> IssaFone push (gerado pelo configurar-issabel.sh)"
+    echo "[from-internal-custom]"
+    for e in $(expandir "$EXT_WEB"); do
+      echo "exten => $e,1,Gosub(issafone-push,s,1($e))"
+      echo " same => n,Goto(ext-local,$e,1)"
+    done
+    cat <<'EOF2'
+
+[issafone-push]
+exten => s,1,GotoIf($["${DEVICE_STATE(SIP/${ARG1})}" != "UNAVAILABLE"]?fim)
+ same => n,Ringing()
+ same => n,System(/usr/local/sbin/issafone-push ${ARG1} ${FILTER(0-9,${CALLERID(num)})} >/dev/null 2>&1 &)
+ same => n,Set(ESPERA=0)
+ same => n(espera),Wait(1)
+ same => n,GotoIf($["${DEVICE_STATE(SIP/${ARG1})}" != "UNAVAILABLE"]?pronto)
+ same => n,Set(ESPERA=$[${ESPERA} + 1])
+ same => n,GotoIf($[${ESPERA} < 30]?espera)
+ same => n,Return()
+ same => n(pronto),Wait(1)
+ same => n(fim),Return()
+; <<< IssaFone push
+EOF2
+  } >> "$EXTC"
+  chown asterisk:asterisk "$EXTC"
+  asterisk -rx "dialplan reload" >/dev/null
+  if asterisk -rx "dialplan show issafone-push" | grep -q DEVICE_STATE; then ok "Plano de marcação: push + espera nas extensões $EXT_WEB"
+  else falha "O plano de marcação do push não ficou carregado"; fi
+  systemctl reload httpd 2>/dev/null
+fi
+
+# -----------------------------------------------------------------------------
 passo "10. Verificação final"
 verificar_tls() { # porta, nome
   local s
@@ -486,6 +558,8 @@ verificar_tls() { # porta, nome
 verificar_tls 443  "Apache / webapp"
 verificar_tls 8089 "Asterisk WSS"
 verificar_tls 7443 "Openfire WebSocket"
+CODE=$(curl -s --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone-push/?acao=chave")
+echo "$CODE" | grep -q '"chave":"B' && ok "Serviço de push responde" || falha "O serviço de push não responde ($CODE)"
 CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone/")
 [ "$CODE" = 200 ] && ok "https://$DOMINIO/issafone/ responde" || falha "A webapp respondeu HTTP $CODE"
 verificar_ws() { # caminho, protocolo, nome

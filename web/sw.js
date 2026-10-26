@@ -22,7 +22,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((chaves) => Promise.all(chaves.filter((k) => k !== VERSAO).map((k) => caches.delete(k))))
+      .then((chaves) => Promise.all(chaves.filter((k) => k !== VERSAO && k !== 'issafone-push').map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -44,8 +44,36 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// Tocar numa notificação traz a app para a frente
+// Push: alguém está a ligar e a página está fechada/suspensa.
+// O aviso vem vazio; pergunta-se ao servidor quem liga para mostrar o nome.
+self.addEventListener('push', (e) => {
+  e.waitUntil((async () => {
+    let quem = '';
+    try {
+      const c = await caches.open('issafone-push');
+      const r = await c.match(new URL('push-dados', self.registration.scope).href);
+      if (r) {
+        const d = await r.json();
+        const u = await fetch(`${d.base}?acao=ultima&ext=${encodeURIComponent(d.ext)}&token=${encodeURIComponent(d.token)}`, { cache: 'no-store' });
+        if (u.ok) { const x = await u.json(); quem = x.nome ? `${x.nome} (${x.numero})` : (x.numero || ''); }
+      }
+    } catch { /* mostra a notificação genérica */ }
+    // No iPhone é obrigatório mostrar sempre uma notificação
+    await self.registration.showNotification(quem ? `${quem} está a ligar` : 'Chamada a receber', {
+      body: 'Toca para atender no IssaFone',
+      tag: 'chamada', renotify: true, requireInteraction: true,
+      icon: 'icons/icone-192.png', badge: 'icons/icone-192.png',
+      vibrate: [400, 200, 400, 200, 400],
+      data: { url: self.registration.scope },
+    });
+  })());
+});
+
+// Tocar numa notificação traz a app para a frente (ou abre-a, se estiver fechada)
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((janelas) => janelas[0]?.focus()));
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
+    const j = janelas.find((w) => w.url.startsWith(self.registration.scope)) || janelas[0];
+    return j ? j.focus() : self.clients.openWindow(e.notification.data?.url || self.registration.scope);
+  }));
 });

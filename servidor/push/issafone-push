@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+IssaFone — envia uma notificação push "está a ligar-te" aos browsers de uma extensão.
+
+Uso:  issafone-push EXTENSAO NUMERO_QUE_LIGA
+Chamado pelo plano de marcação do Asterisk quando a extensão web não está registada.
+
+Push sem conteúdo (Web Push + VAPID): não é preciso cifrar nada. O service worker
+da webapp, ao receber o aviso, pergunta ao servidor quem está a ligar.
+Funciona com Python 2.7 (CentOS 7) e 3; só usa o openssl e o curl do sistema.
+"""
+import base64, json, os, re, subprocess, sys, time
+
+CONF = '/etc/issafone/push.conf'
+CHAVE = '/etc/issafone/vapid.pem'
+
+
+def b64url(dados):
+    return base64.urlsafe_b64encode(dados).decode('ascii').rstrip('=')
+
+
+def ler_conf():
+    conf = {}
+    for linha in open(CONF):
+        if '=' in linha and not linha.strip().startswith(';'):
+            k, v = linha.split('=', 1)
+            conf[k.strip()] = v.strip().strip('"')
+    return conf
+
+
+def der_para_raw(der):
+    """Assinatura ECDSA em DER (openssl) → r||s com 64 bytes (formato JWT)."""
+    out = subprocess.Popen(['openssl', 'asn1parse', '-inform', 'DER'], stdin=subprocess.PIPE,
+                           stdout=subprocess.PIPE).communicate(der)[0].decode('ascii')
+    numeros = re.findall(r'INTEGER\s*:([0-9A-Fa-f]+)', out)
+    raw = b''
+    for n in numeros[:2]:
+        n = n.rjust(64, '0')[-64:]
+        raw += bytearray.fromhex(n) if sys.version_info[0] < 3 else bytes.fromhex(n)
+    return bytes(raw)
+
+
+def jwt(audiencia, sujeito):
+    cab = b64url(json.dumps({'typ': 'JWT', 'alg': 'ES256'}, separators=(',', ':')).encode())
+    corpo = b64url(json.dumps({'aud': audiencia, 'exp': int(time.time()) + 12 * 3600, 'sub': sujeito},
+                              separators=(',', ':')).encode())
+    assinar = (cab + '.' + corpo).encode()
+    der = subprocess.Popen(['openssl', 'dgst', '-sha256', '-sign', CHAVE], stdin=subprocess.PIPE,
+                           stdout=subprocess.PIPE).communicate(assinar)[0]
+    return cab + '.' + corpo + '.' + b64url(der_para_raw(der))
+
+
+def enviar(endpoint, conf):
+    m = re.match(r'^(https://[^/]+)', endpoint)
+    if not m:
+        return 0
+    token = jwt(m.group(1), 'mailto:issafone@' + conf.get('dominio', 'localhost'))
+    p = subprocess.Popen(['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '10',
+                          '-X', 'POST', '-H', 'TTL: 30', '-H', 'Urgency: high', '-H', 'Content-Length: 0',
+                          '-H', 'Authorization: vapid t=%s, k=%s' % (token, conf['chave_publica']),
+                          endpoint], stdout=subprocess.PIPE)
+    try:
+        return int(p.communicate()[0] or 0)
+    except ValueError:
+        return 0
+
+
+def nome_de(numero):
+    try:
+        out = subprocess.Popen(['asterisk', '-rx', 'database get AMPUSER/%s cidname' % numero],
+                               stdout=subprocess.PIPE).communicate()[0].decode('utf-8', 'replace')
+        m = re.search(r'Value:\s*(.+)', out)
+        return m.group(1).strip() if m else ''
+    except Exception:
+        return ''
+
+
+def main():
+    if len(sys.argv) < 2 or not re.match(r'^[0-9]{2,8}$', sys.argv[1]):
+        sys.exit('uso: issafone-push EXTENSAO [NUMERO_QUE_LIGA]')
+    ext = sys.argv[1]
+    numero = re.sub(r'[^0-9+*#]', '', sys.argv[2] if len(sys.argv) > 2 else '')[:20]
+    conf = ler_conf()
+    pasta = conf['pasta']
+
+    # Quem está a ligar (o service worker vai buscar isto para mostrar o nome)
+    ultima = os.path.join(pasta, 'ultima-%s.json' % ext)
+    with open(ultima + '.tmp', 'w') as f:
+        json.dump({'numero': numero, 'nome': nome_de(numero) if numero else '', 'quando': int(time.time())}, f)
+    os.chmod(ultima + '.tmp', 0o660)
+    os.rename(ultima + '.tmp', ultima)
+
+    ficheiro = os.path.join(pasta, '%s.json' % ext)
+    if not os.path.exists(ficheiro):
+        print('Extensão %s sem aparelhos subscritos' % ext)
+        return
+    dados = json.load(open(ficheiro))
+    validas = []
+    for s in dados.get('subs', []):
+        codigo = enviar(s['endpoint'], conf)
+        print('%s → HTTP %s' % (s['endpoint'][:60], codigo))
+        if codigo not in (404, 410):          # 404/410: o browser já não existe
+            validas.append(s)
+    if len(validas) != len(dados.get('subs', [])):
+        dados['subs'] = validas
+        with open(ficheiro + '.tmp', 'w') as f:
+            json.dump(dados, f)
+        os.chmod(ficheiro + '.tmp', 0o660)
+        os.rename(ficheiro + '.tmp', ficheiro)
+
+
+if __name__ == '__main__':
+    main()

@@ -76,10 +76,14 @@
         <span id="estado-xmpp" class="estado"><i></i>Chat: desligado</span>
       </span>
     </div>
-    <button id="btn-notificacoes" class="discreto" hidden>Ativar notificações</button>
+    <button id="btn-notificacoes" class="discreto" hidden title="Ativar notificações">🔔<span class="rotulo"> Ativar notificações</span></button>
     <button id="btn-tema" class="discreto" title="Tema">◐<span class="rotulo"> Automático</span></button>
     <button id="btn-sair" class="discreto">Sair</button>
   </header>
+  <div id="dica" class="dica" hidden>
+    <span id="dica-texto"></span>
+    <button id="dica-fechar" class="discreto" aria-label="Fechar">✕</button>
+  </div>
 
   <div class="corpo" data-vista="teclado">
     <!-- Contactos -->
