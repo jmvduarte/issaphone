@@ -311,6 +311,7 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
     var mute by remember { mutableStateOf(false) }
     var teclas by remember { mutableStateOf(false) }
     val camaraLigada by vm.sip.camaraLigada.collectAsState()
+    val altaVoz by vm.sip.altaVoz.collectAsState()
     var segundos by remember { mutableIntStateOf(0) }
     LaunchedEffect(c.estado == "Em chamada") {
         segundos = 0
@@ -379,7 +380,13 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                BotaoRedondo("Desligar", Vermelho) { vm.sip.desligar() }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BotaoRedondo(
+                        if (altaVoz) "🔊 Alta voz" else "🔈 Alta voz",
+                        if (altaVoz) Color(0xFF2F5BFF) else Color(0x33FFFFFF)
+                    ) { vm.sip.alternarAltaVoz() }
+                    BotaoRedondo("Desligar", Vermelho) { vm.sip.desligar() }
+                }
             }
         }
     }

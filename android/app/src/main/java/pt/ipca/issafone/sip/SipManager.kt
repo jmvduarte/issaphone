@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.linphone.core.Account
+import org.linphone.core.AudioDevice
 import org.linphone.core.Call
 import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
@@ -40,6 +41,10 @@ class SipManager(context: Context) {
     private val _camaraLigada = MutableStateFlow(true)
     val camaraLigada: StateFlow<Boolean> = _camaraLigada
 
+    /** Som a sair pelo altifalante (alta voz). */
+    private val _altaVoz = MutableStateFlow(false)
+    val altaVoz: StateFlow<Boolean> = _altaVoz
+
     private var dominio = ""
 
     /** Registo de chamadas (feitas, recebidas, perdidas, recusadas). */
@@ -57,6 +62,11 @@ class SipManager(context: Context) {
                 RegistrationState.Cleared -> "Desligado"
                 else -> state.name
             }
+        }
+
+        // A Linphone muda de saída sozinha (ex.: videochamada → altifalante; auriculares ligados)
+        override fun onAudioDeviceChanged(core: Core, audioDevice: AudioDevice) {
+            _altaVoz.value = audioDevice.type == AudioDevice.Type.Speaker
         }
 
         override fun onCallStateChanged(core: Core, call: Call, state: Call.State, message: String) {
@@ -82,7 +92,7 @@ class SipManager(context: Context) {
                 Call.State.Paused -> CallUi("Em espera", remoto, ativa = true)
                 Call.State.Error -> CallUi("Erro: $message", remoto)
                 Call.State.End,
-                Call.State.Released -> CallUi().also { _camaraLigada.value = true }
+                Call.State.Released -> CallUi().also { _camaraLigada.value = true; _altaVoz.value = false }
                 else -> _chamada.value
             }
             _chamada.value = if (novo.remoto.isNotEmpty() && novo.nome.isEmpty()) novo.copy(nome = nome) else novo
@@ -176,6 +186,22 @@ class SipManager(context: Context) {
 
     fun desligar() {
         chamadaAtual()?.terminate()
+    }
+
+    /** Liga/desliga a alta voz. Ao desligar, usa os auriculares (Bluetooth/fios) se houver, senão o auscultador. */
+    fun alternarAltaVoz() {
+        val call = chamadaAtual() ?: return
+        val ligar = !_altaVoz.value
+        val saidas = core.audioDevices.filter { it.hasCapability(AudioDevice.Capabilities.CapabilityPlay) }
+        val destino = if (ligar) {
+            saidas.firstOrNull { it.type == AudioDevice.Type.Speaker }
+        } else {
+            saidas.firstOrNull { it.type == AudioDevice.Type.Bluetooth }
+                ?: saidas.firstOrNull { it.type == AudioDevice.Type.Headset || it.type == AudioDevice.Type.Headphones }
+                ?: saidas.firstOrNull { it.type == AudioDevice.Type.Earpiece }
+        } ?: return
+        call.outputAudioDevice = destino
+        _altaVoz.value = ligar
     }
 
     fun alternarMute(): Boolean {
