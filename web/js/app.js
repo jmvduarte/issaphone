@@ -400,7 +400,14 @@ const Sip = {
     setTimeout(() => this.atualizarVideo(), 1500); // o vídeo remoto às vezes chega um pouco depois
   },
 
-  atender(video = false) { Toque.libertar(); this.sessao?.answer(this.opcoes(video)); },
+  atender(video = false) {
+    Toque.libertar();
+    // Se falhar, mostra o motivo em vez de ficar parado (ex.: a chamada já tinha sido cancelada)
+    try { this.sessao?.answer(this.opcoes(video)); } catch (e) {
+      UI.estadoChamada(`Não foi possível atender: ${e.message}`);
+      setTimeout(() => this.fim(`Não foi possível atender: ${e.message}`), 3000);
+    }
+  },
   desligar() {
     if (this.info?.recebida && !this.info.atendida) this.info.recusei = true;
     try { this.sessao?.terminate(); } catch { this.fim('Chamada terminada'); }
