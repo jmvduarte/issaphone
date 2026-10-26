@@ -10,6 +10,9 @@ on:
     paths: ['ios/**', '.github/workflows/ios.yml']
   workflow_dispatch:   # permite correr à mão no separador Actions
 
+permissions:
+  contents: write   # para publicar o .ipa numa Release (link fixo para descarregar)
+
 jobs:
   build:
     runs-on: macos-15
@@ -86,6 +89,17 @@ jobs:
           name: IssaFone-ipa
           path: ios/IssaFone-unsigned.ipa
           retention-days: 14
+
+      - name: Publicar na Release "ios" (link fixo)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Pré-lançamento: não aparece como "latest", para não baralhar as atualizações do Android
+          gh release view ios >/dev/null 2>&1 || gh release create ios --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "IssaFone iOS (sem assinatura)" \
+            --notes "Instalar com o Sideloadly (Windows/Mac) e um Apple ID gratuito. Ver README."
+          gh release upload ios IssaFone-unsigned.ipa --clobber
+          echo "::notice::https://github.com/${GITHUB_REPOSITORY}/releases/download/ios/IssaFone-unsigned.ipa"
 
       - name: Publicar log em caso de erro
         if: failure()
