@@ -23,6 +23,11 @@ const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } 
 const ler = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 
 function completarConfig(c) {
+  // Guarda-se só o que a pessoa escreveu; os valores por omissão calculam-se sempre de novo.
+  // (Antes guardava-se a palavra-passe do chat calculada, e ao mudar a da extensão o chat ficava com a antiga.)
+  const original = { ...c };
+  delete original.original;
+  delete original.sessao;
   const host = ((c.servidor || '').trim() || SERVIDOR_PADRAO).replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   return {
     ...c,
@@ -33,7 +38,18 @@ function completarConfig(c) {
     wsSip: (c.wsSip || '').trim() || `wss://${host}:8089/ws`,
     wsXmpp: (c.wsXmpp || '').trim() || `wss://${host}:7443/ws/`,
     stun: (c.stun || '').trim(),
+    original,
   };
+}
+
+/** Configurações guardadas por versões antigas incluíam valores calculados: descarta-os. */
+function lerConfigGuardada() {
+  const c = ler(CHAVE_CONFIG);
+  if (!c || c.v === 2) return c;
+  for (const k of ['passXmpp', 'dominioXmpp', 'wsSip', 'wsXmpp']) delete c[k];
+  c.v = 2;
+  guardar(CHAVE_CONFIG, c);
+  return c;
 }
 
 /* ======================= Histórico do chat ======================= */
@@ -1245,7 +1261,7 @@ function entrar(c) {
   const erro = verificarRequisitos();
   if (erro) { $('#erro-login').textContent = erro; $('#erro-login').hidden = false; return; }
   cfg = c;
-  guardar(CHAVE_CONFIG, { ...c, sessao: true });
+  guardar(CHAVE_CONFIG, { ...c.original, v: 2, sessao: true });
   $('#ecra-login').hidden = true;
   $('#ecra-app').hidden = false;
   UI.porLer.clear();
@@ -1262,7 +1278,7 @@ function sair() {
   if (Sip.sessao && !confirm('Estás em chamada. Sair mesmo assim?')) return;
   Sip.sair();
   Xmpp.sair();
-  const c = ler(CHAVE_CONFIG);
+  const c = lerConfigGuardada();
   if (c) guardar(CHAVE_CONFIG, { ...c, sessao: false });
   cfg = null;
   mostrarLogin(c);
@@ -1273,7 +1289,7 @@ function sair() {
 montarTeclados();
 ligarEventos();
 Tema.aplicar(Tema.atual());
-const guardada = ler(CHAVE_CONFIG);
+const guardada = lerConfigGuardada();
 if (guardada?.sessao && !verificarRequisitos()) entrar(completarConfig(guardada));
 else mostrarLogin(guardada);
 
