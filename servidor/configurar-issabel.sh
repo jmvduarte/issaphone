@@ -5,7 +5,7 @@
 #  Faz, por esta ordem:
 #   1. Verificações (DNS, Asterisk, Openfire)
 #   2. Certificado Let's Encrypt para o domínio (+ renovação automática)
-#   3. HTTPS no Apache com esse certificado
+#   3. HTTPS no Apache com esse certificado (e WebSockets também pela 443)
 #   4. SIP sobre WebSocket seguro no Asterisk (porta 8089) — para a webapp
 #   5. Opções WebRTC nas extensões da webapp
 #   6. Openfire: certificado + contas de chat = extensões do Issabel
@@ -145,6 +145,40 @@ if [ -f "$LE/fullchain.pem" ] && [ -f "$SSL" ]; then
   else cp -a "$SSL.antes-issafone" "$SSL"; falha "Configuração do Apache inválida — reposta a original"; fi
 else
   aviso "Apache não alterado (sem certificado ou sem $SSL)"
+fi
+
+# -----------------------------------------------------------------------------
+passo "4b. WebSockets também pela porta 443 (redes que bloqueiam 8089/7443)"
+# Muitas redes de empresa/escola só deixam passar a 443. O Apache reencaminha:
+#   https://DOMINIO/issafone-ws/sip  → Asterisk wss://127.0.0.1:8089/ws
+#   https://DOMINIO/issafone-ws/xmpp → Openfire wss://127.0.0.1:7443/ws/
+# A webapp tenta primeiro as portas diretas e, se falharem, usa estas.
+INC=/etc/httpd/conf.d/issafone-ws.inc
+if [ -f "$SSL" ] && httpd -M 2>/dev/null | grep -q proxy_wstunnel; then
+  cat > "$INC" <<'EOF2'
+# Gerado pelo configurar-issabel.sh (IssaFone) — incluído no VirtualHost 443 do ssl.conf
+SSLProxyEngine on
+SSLProxyVerify none
+SSLProxyCheckPeerCN off
+SSLProxyCheckPeerName off
+SSLProxyCheckPeerExpire off
+# timeout alto: a ligação fica aberta e parada entre mensagens
+ProxyPass        /issafone-ws/sip  wss://127.0.0.1:8089/ws  timeout=3600
+ProxyPass        /issafone-ws/xmpp wss://127.0.0.1:7443/ws/ timeout=3600
+EOF2
+  copia "$SSL"
+  if ! grep -q "issafone-ws.inc" "$SSL"; then
+    # Só no primeiro VirtualHost (o da 443)
+    awk -v inc="Include $INC" '!feito && /<\/VirtualHost>/ { print inc; feito=1 } { print }' "$SSL" > "$SSL.novo" && mv "$SSL.novo" "$SSL"
+  fi
+  if apachectl configtest >/dev/null 2>&1; then
+    systemctl reload httpd && ok "WebSockets disponíveis em https://$DOMINIO/issafone-ws/ (porta 443)"
+  else
+    sed -i "\|Include $INC|d" "$SSL"; rm -f "$INC"
+    falha "Configuração do proxy WebSocket inválida — retirada ($(apachectl configtest 2>&1 | grep -v '^Syntax OK' | head -1))"
+  fi
+else
+  aviso "Proxy WebSocket não configurado (falta $SSL ou o módulo proxy_wstunnel do Apache)"
 fi
 
 # -----------------------------------------------------------------------------
@@ -454,6 +488,17 @@ verificar_tls 8089 "Asterisk WSS"
 verificar_tls 7443 "Openfire WebSocket"
 CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone/")
 [ "$CODE" = 200 ] && ok "https://$DOMINIO/issafone/ responde" || falha "A webapp respondeu HTTP $CODE"
+verificar_ws() { # caminho, protocolo, nome
+  local c
+  c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 --http1.1 --resolve "$DOMINIO:443:127.0.0.1" \
+    -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" \
+    -H "Sec-WebSocket-Key: SXNzYUZvbmVJc3NhRm9uZQ==" -H "Sec-WebSocket-Protocol: $2" "https://$DOMINIO$1")
+  [ "$c" = 101 ] && ok "$3 pela porta 443 ($1)" || falha "$3 pela porta 443 não responde (HTTP $c)"
+}
+if [ -f /etc/httpd/conf.d/issafone-ws.inc ]; then
+  verificar_ws /issafone-ws/sip sip "Telefone (SIP)"
+  verificar_ws /issafone-ws/xmpp xmpp "Chat (XMPP)"
+fi
 
 echo
 echo "${NEGRITO}== Resumo ==${FIM}"
@@ -464,6 +509,7 @@ cat <<EOF
 
 No router, redireciona para $(hostname -I | awk '{print $1}'):
   TCP 80, 443, 5222, 7443, 8089   e   UDP 5060, 10000-20000
+  (a webapp também funciona só com a 443, para redes que bloqueiam 8089/7443)
 
 Webapp:        https://$DOMINIO/issafone/   (extensões $EXT_WEB)
 Apps:          entrar com o número da extensão e a respetiva palavra-passe (secret)

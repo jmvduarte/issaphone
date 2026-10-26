@@ -35,8 +35,10 @@ function completarConfig(c) {
     extensao: c.extensao.trim(),
     dominioXmpp: (c.dominioXmpp || '').trim() || host,
     passXmpp: c.passXmpp || c.passSip,
-    wsSip: (c.wsSip || '').trim() || `wss://${host}:8089/ws`,
-    wsXmpp: (c.wsXmpp || '').trim() || `wss://${host}:7443/ws/`,
+    // Primeiro pela 443 (passa em redes de empresa/escola, que bloqueiam 8089/7443);
+    // se o servidor ainda não tiver o reencaminhamento, a 443 falha logo e usa-se a porta direta.
+    urlsSip: (c.wsSip || '').trim() ? [c.wsSip.trim()] : [`wss://${host}/issafone-ws/sip`, `wss://${host}:8089/ws`],
+    urlsXmpp: (c.wsXmpp || '').trim() ? [c.wsXmpp.trim()] : [`wss://${host}/issafone-ws/xmpp`, `wss://${host}:7443/ws/`],
     stun: (c.stun || '').trim(),
     original,
   };
@@ -178,9 +180,10 @@ const Sip = {
 
   ligar() {
     JsSIP.debug.disable('JsSIP:*');
-    const socket = new JsSIP.WebSocketInterface(cfg.wsSip);
+    // O JsSIP usa o de maior peso e, se falhar, passa ao seguinte
+    const sockets = cfg.urlsSip.map((url, i) => ({ socket: new JsSIP.WebSocketInterface(url), weight: cfg.urlsSip.length - i }));
     this.ua = new JsSIP.UA({
-      sockets: [socket],
+      sockets,
       uri: `sip:${cfg.extensao}@${cfg.servidor}`,
       password: cfg.passSip,
       register: true,
@@ -189,7 +192,7 @@ const Sip = {
     });
     this.ua.on('connecting', () => UI.estado('sip', 'aviso', 'a ligar…'));
     this.ua.on('connected', () => UI.estado('sip', 'aviso', 'a registar…'));
-    this.ua.on('disconnected', () => UI.estado('sip', 'erro', 'sem ligação (WSS 8089 e certificado?)'));
+    this.ua.on('disconnected', () => UI.estado('sip', 'erro', 'sem ligação ao servidor (portas 443/8089)'));
     this.ua.on('registered', () => UI.estado('sip', 'ok', 'registado'));
     this.ua.on('unregistered', () => UI.estado('sip', '', 'desligado'));
     this.ua.on('registrationFailed', (e) => {
@@ -362,7 +365,7 @@ const NS = {
 };
 
 const Xmpp = {
-  con: null, contactos: new Map(), grupos: new Map(), manual: false, tentativas: 0,
+  con: null, contactos: new Map(), grupos: new Map(), manual: false, tentativas: 0, url: 0, jaLigou: false,
 
   jid(utilizador) { return utilizador.includes('@') ? utilizador : `${utilizador}@${cfg.dominioXmpp}`; },
   get servicoGrupos() { return `conference.${cfg.dominioXmpp}`; },
@@ -373,9 +376,16 @@ const Xmpp = {
   ligar() {
     this.manual = false;
     this.falhouAuth = false;
-    this.con = new Strophe.Connection(cfg.wsXmpp, { protocol: 'wss' });
+    const con = new Strophe.Connection(cfg.urlsXmpp[this.url % cfg.urlsXmpp.length], { protocol: 'wss' });
+    this.con = con;
+    let terminou = false;
     const recurso = 'web-' + Math.random().toString(36).slice(2, 7);
-    this.con.connect(`${this.eu}/${recurso}`, cfg.passXmpp, (st) => this.mudouEstado(st));
+    con.connect(`${this.eu}/${recurso}`, cfg.passXmpp, (st) => {
+      // Ignora avisos de ligações antigas e o DISCONNECTED repetido (senão abriam-se várias tentativas)
+      if (con !== this.con || terminou) return;
+      if (st === Strophe.Status.DISCONNECTED) terminou = true;
+      this.mudouEstado(st);
+    });
   },
 
   mudouEstado(st) {
@@ -383,8 +393,8 @@ const Xmpp = {
     if (st === S.CONNECTING) UI.estado('xmpp', 'aviso', 'a ligar…');
     else if (st === S.AUTHENTICATING) UI.estado('xmpp', 'aviso', 'a autenticar…');
     else if (st === S.AUTHFAIL) { this.manual = true; this.falhouAuth = true; UI.estado('xmpp', 'erro', 'palavra-passe errada'); }
-    else if (st === S.CONNFAIL) UI.estado('xmpp', 'erro', 'sem ligação (WSS 7443 e certificado?)');
-    else if (st === S.CONNECTED) { this.tentativas = 0; UI.estado('xmpp', 'ok', 'ligado'); this.aposLigar(); }
+    else if (st === S.CONNFAIL) UI.estado('xmpp', 'erro', 'sem ligação ao servidor (portas 443/7443)');
+    else if (st === S.CONNECTED) { this.tentativas = 0; this.jaLigou = true; UI.estado('xmpp', 'ok', 'ligado'); this.aposLigar(); }
     else if (st === S.DISCONNECTED) {
       for (const c of this.contactos.values()) c.online = false;
       for (const g of this.grupos.values()) { g.dentro = false; g.ocupantes.clear(); }
@@ -394,6 +404,13 @@ const Xmpp = {
         if (this.falhouAuth) this.falhouAuth = false; else UI.estado('xmpp', '', 'desligado');
         return;
       }
+      // Nunca chegou a ligar por este endereço: experimenta logo o seguinte (443 ↔ 7443)
+      if (!this.jaLigou && cfg.urlsXmpp.length > 1 && this.url % cfg.urlsXmpp.length === 0) {
+        this.url++;
+        setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, 500);
+        return;
+      }
+      if (!this.jaLigou) this.url = 0;
       const espera = Math.min(60, 5 * 2 ** this.tentativas++);
       UI.estado('xmpp', 'erro', `desligado — nova tentativa em ${espera}s`);
       setTimeout(() => { if (!this.manual && cfg) this.ligar(); }, espera * 1000);
@@ -678,6 +695,7 @@ const Xmpp = {
 
   sair() {
     this.manual = true;
+    this.jaLigou = false; this.url = 0; this.tentativas = 0;
     try { this.con?.disconnect(); } catch { /* ignora */ }
     this.con = null;
     this.contactos.clear();

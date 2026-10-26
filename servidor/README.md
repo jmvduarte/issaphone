@@ -39,6 +39,7 @@ Para veres o que o serviço fez: `journalctl -t issafone`.
 | Let's Encrypt | Certificado para o domínio, renovado automaticamente. Em cada renovação, é copiado para o Asterisk e o Openfire |
 | Apache | HTTPS com o certificado válido |
 | Asterisk | WebSocket seguro na porta 8089 (`http.conf`) |
+| WebSockets pela 443 | O Apache reencaminha `/issafone-ws/sip` (→ 8089) e `/issafone-ws/xmpp` (→ 7443). A webapp tenta primeiro a 443 e só depois as portas diretas, para funcionar em redes de empresa/escola que bloqueiam 8089 e 7443 |
 | Extensões web | Opções WebRTC (DTLS, ICE, AVPF, rtcp-mux) em `sip_custom_post.conf`, aplicadas só às extensões que existem, e um serviço que as atualiza sozinho quando crias extensões |
 | Openfire | Certificado válido. As contas de chat passam a ser as próprias extensões do Issabel, com a mesma palavra-passe (o Openfire autentica na tabela `asterisk.sip`), e todas pertencem ao grupo `IssaFone` |
 | Firewall | Abre as portas necessárias. A 9090 fica aberta só na rede local |
