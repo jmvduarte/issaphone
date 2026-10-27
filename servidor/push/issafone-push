@@ -93,13 +93,19 @@ def main():
 
     ficheiro = os.path.join(pasta, '%s.json' % ext)
     if not os.path.exists(ficheiro):
-        print('Extensão %s sem aparelhos subscritos' % ext)
+        print('Extensao %s sem aparelhos subscritos' % ext)
         return
     dados = json.load(open(ficheiro))
     validas = []
-    for s in dados.get('subs', []):
-        codigo = enviar(s['endpoint'], conf)
-        print('%s → HTTP %s' % (s['endpoint'][:60], codigo))
+    # Mais recentes primeiro (o aparelho em uso costuma ser o último a subscrever)
+    for s in sorted(dados.get('subs', []), key=lambda x: x.get('criada', 0), reverse=True):
+        try:
+            codigo = enviar(str(s['endpoint']), conf)
+        except Exception as e:
+            codigo = 0
+            sys.stderr.write('erro: %r\n' % (e,))
+        # Só ASCII: no Python 2 do CentOS 7, misturar texto unicode com acentos fazia o script parar aqui
+        print('%s -> HTTP %s' % (str(s['endpoint'])[:60], codigo))
         if codigo not in (404, 410):          # 404/410: o browser já não existe
             validas.append(s)
     if len(validas) != len(dados.get('subs', [])):
