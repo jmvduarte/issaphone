@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,8 @@ class MainActivity : ComponentActivity() {
         tratarIntent(intent)
         mostrarSobreBloqueioDuranteChamadas()
 
+        // Desenha por baixo das barras do sistema (o degradê do cabeçalho vai até ao topo)
+        enableEdgeToEdge()
         setContent {
             val tema by vm.tema.collectAsState()
             pt.ipca.issafone.ui.IssaFoneTema(tema) {
