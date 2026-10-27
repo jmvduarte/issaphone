@@ -136,6 +136,9 @@ class SipManager(context: Context) {
         // Cifra: áudio e vídeo SRTP obrigatórios (o servidor também os exige)
         core.mediaEncryption = MediaEncryption.SRTP
         core.isMediaEncryptionMandatory = true
+        // Só as cifras que o Asterisk 16 (libsrtp 1.5) suporta. A Linphone oferecia primeiro
+        // AEAD_AES_128_GCM, que o Asterisk recusa ("Unsupported crypto suite").
+        core.config.setString("sip", "srtp_crypto_suites", "AES_CM_128_HMAC_SHA1_80, AES_CM_128_HMAC_SHA1_32")
         // SIP sobre TLS: valida o certificado Let's Encrypt do servidor com as CAs do Android
         carregarCAsDoSistema()?.let { core.setRootCaData(it) }
         core.verifyServerCertificates(true)

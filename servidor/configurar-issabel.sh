@@ -241,8 +241,16 @@ tlscertfile=/etc/asterisk/keys/fullchain.pem
 tlsprivatekey=/etc/asterisk/keys/privkey.pem
 tlsclientmethod=tlsv1_2
 tlsdontverifyserver=yes
+; NAT: o Issabel está atrás do router. Sem isto, o Asterisk anuncia o IP privado
+; (192.168.31.x) e os telemóveis fora de casa não conseguem responder (sem som e
+; chamadas a cair com "no reply to our critical packet").
+externhost=__DOMINIO__
+externrefresh=300
+localnet=__REDE__
+localnet=127.0.0.0/255.0.0.0
 ; <<< IssaFone
 EOF
+sed -i -e "s|__DOMINIO__|$DOMINIO|" -e "s|__REDE__|$REDE_LOCAL|" "$GEN"
 grep -q "sip_general_custom.conf" /etc/asterisk/sip.conf || aviso "O sip.conf não inclui o sip_general_custom.conf — o vídeo pode ficar desligado"
 asterisk -rx "sip reload" >/dev/null; sleep 1
 if asterisk -rx "sip show settings" | grep -iE "Videosupport:\s*Yes" >/dev/null; then ok "Vídeo ativo no Asterisk (VP8, H.264)"
@@ -253,6 +261,8 @@ if asterisk -rx "sip show settings" | grep -iE "TLS SIP Bind.*5061|tlsbindaddr.*
 else
   aviso "Não consegui confirmar o SIP sobre TLS (vê: asterisk -rx 'sip show settings' | grep -i tls)"
 fi
+if asterisk -rx "sip show settings" | grep -iE "Externhost:\s*$DOMINIO" >/dev/null; then ok "NAT: o Asterisk anuncia o endereço público ($DOMINIO)"
+else aviso "Não consegui confirmar o externhost (vê: asterisk -rx 'sip show settings' | grep -i extern)"; fi
 
 # -----------------------------------------------------------------------------
 passo "6. Extensões da webapp com WebRTC ($EXT_WEB)"
