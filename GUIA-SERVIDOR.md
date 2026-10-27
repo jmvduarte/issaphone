@@ -181,7 +181,8 @@ Carrega em **Submit** e depois no botão vermelho **Apply Config**. Em poucos se
 4. No topo deve aparecer **Telefone · registado** e **Chat · ligado**. A app atualiza-se sozinha.
 
 ### PC e iPhone: webapp
-1. Abre `https://O_TEU_DOMINIO/issafone/` e entra com uma extensão **200–250**.
+1. Abre `https://O_TEU_DOMINIO/issafone/` (instalada pelo script no teu servidor) e entra com uma extensão **200–250**.
+   Em alternativa, há uma versão alojada no GitHub que pede o servidor: **https://jmvduarte.github.io/issaphone/**. O endereço do teu próprio servidor funciona melhor: os anexos e as redes que só deixam passar a porta 443 só funcionam aí.
 2. **iPhone:** no Safari, *Partilhar → Adicionar ao ecrã principal*, abre a webapp pelo ícone e toca no 🔔 para ativar as notificações (é assim que recebes chamadas com a página fechada).
 
 ---

@@ -15,9 +15,11 @@ let cfg = null;
 
 // Servidor pré-configurado. Se a webapp estiver alojada no próprio Issabel
 // (https://dominio/issafone/), usa o domínio da página.
+// No GitHub Pages a webapp é a versão genérica (IssaLink): pede o servidor a quem entra.
 const SERVIDOR_PROJETO = 'rsi-a36357.ddns.net';
-const SERVIDOR_PADRAO = /(^localhost$|^127\.|github\.io$)/.test(location.hostname)
-  ? SERVIDOR_PROJETO : location.hostname;
+const GENERICA = /github\.io$/.test(location.hostname) || new URLSearchParams(location.search).has('generica');
+const SERVIDOR_PADRAO = GENERICA ? '' : /(^localhost$|^127\.)/.test(location.hostname) ? SERVIDOR_PROJETO : location.hostname;
+const NOME_APP = GENERICA ? 'IssaLink' : 'IssaFone';
 
 const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* modo privado */ } };
 const ler = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -408,7 +410,7 @@ const Sip = {
     UI.abrirChamada({ nome, numero, recebida, ofereceVideo });
     if (recebida) {
       Toque.tocar();
-      Avisos.mostrar((ofereceVideo ? 'Videochamada de ' : 'Chamada de ') + nome, 'IssaFone', 'chamada');
+      Avisos.mostrar((ofereceVideo ? 'Videochamada de ' : 'Chamada de ') + nome, NOME_APP, 'chamada');
     }
   },
 
@@ -1052,7 +1054,7 @@ const UI = {
 
   /** Avisos importantes abrem uma janela; os discretos só aparecem como notificação. */
   aviso(texto, discreto = false) {
-    if (discreto) { Avisos.mostrar('IssaFone', texto, 'aviso'); return; }
+    if (discreto) { Avisos.mostrar(NOME_APP, texto, 'aviso'); return; }
     alert(texto);
   },
 
@@ -1125,7 +1127,7 @@ const UI = {
     const total = [...this.porLer.values()].reduce((a, b) => a + b, 0);
     $('#por-ler').hidden = total === 0;
     $('#por-ler').textContent = total;
-    document.title = total ? `(${total}) IssaFone` : 'IssaFone';
+    document.title = total ? `(${total}) ${NOME_APP}` : NOME_APP;
   },
 
   /* ---- Conversa ---- */
@@ -1508,6 +1510,21 @@ function verificarRequisitos() {
   return null;
 }
 
+/** Versão genérica: o campo do servidor passa para o topo do formulário e é obrigatório. */
+function prepararGenerica() {
+  if (!GENERICA) return;
+  document.title = NOME_APP;
+  $('.marca h1').textContent = NOME_APP;
+  $('.marca .sub').textContent = 'Chamadas e chat para a tua central Issabel';
+  $('.topo .titulo strong').textContent = NOME_APP;
+  const rotulo = $('#form-login input[name="servidor"]').closest('label');
+  rotulo.firstChild.textContent = 'Servidor';
+  const campo = rotulo.querySelector('input');
+  campo.required = true; campo.placeholder = 'pbx.empresa.pt';
+  $('#form-login input[name="extensao"]').closest('label').before(rotulo);
+  $('#form-login input[name="extensao"]').placeholder = '200';
+}
+
 function mostrarLogin(c) {
   $('#ecra-app').hidden = true;
   $('#ecra-login').hidden = false;
@@ -1550,6 +1567,7 @@ function sair() {
 
 /* ======================= Arranque ======================= */
 
+prepararGenerica();
 montarTeclados();
 ligarEventos();
 Tema.aplicar(Tema.atual());
