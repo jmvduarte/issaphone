@@ -10,6 +10,7 @@ import org.linphone.core.Core
 import org.linphone.core.CoreListenerStub
 import org.linphone.core.Factory
 import org.linphone.core.MediaEncryption
+import org.linphone.core.Reason
 import org.linphone.core.RegistrationState
 import org.linphone.core.TransportType
 
@@ -21,7 +22,11 @@ data class CallUi(
     val ativa: Boolean = false,
     val ofereceVideo: Boolean = false,  // a chamada recebida traz vídeo
     val comVideo: Boolean = false,      // a chamada em curso tem vídeo
-    val nome: String = ""               // nome enviado pelo Issabel (Display Name), se houver
+    val nome: String = "",              // nome enviado pelo Issabel (Display Name), se houver
+    val emEspera: String = "",          // outra chamada em espera (número), se houver
+    val chamadas: Int = 0,              // número de chamadas abertas (para alternar/juntar)
+    val conferencia: Boolean = false,   // várias pessoas juntas na mesma chamada
+    val participantes: Int = 0
 )
 
 /**
@@ -65,6 +70,11 @@ class SipManager(context: Context) {
             }
         }
 
+        // Conferência criada/terminada: atualiza o ecrã
+        override fun onConferenceStateChanged(core: Core, conference: org.linphone.core.Conference, state: org.linphone.core.Conference.State) {
+            _chamada.value = calcularUi(null, null)
+        }
+
         // A Linphone muda de saída sozinha (ex.: videochamada → altifalante; auriculares ligados)
         override fun onAudioDeviceChanged(core: Core, audioDevice: AudioDevice) {
             _altaVoz.value = audioDevice.type == AudioDevice.Type.Speaker
@@ -78,28 +88,53 @@ class SipManager(context: Context) {
             if (state == Call.State.Released) registar(call, remoto)
             // Ao atender/ser atendido: se houver auriculares Bluetooth ligados, o som vai para lá
             if (state == Call.State.Connected) usarBluetoothSeHouver(call)
-            val nome = call.remoteAddress.displayName?.takeIf { it.isNotBlank() && it != remoto } ?: ""
-            val novo = when (state) {
-                Call.State.IncomingReceived -> {
-                    val oferece = call.remoteParams?.isVideoEnabled == true
-                    CallUi(if (oferece) "Videochamada a chegar" else "A receber chamada", remoto,
-                        aTocar = true, ofereceVideo = oferece)
-                }
-                Call.State.OutgoingInit,
-                Call.State.OutgoingProgress,
-                Call.State.OutgoingRinging -> CallUi("A chamar…", remoto, ativa = true, comVideo = call.params.isVideoEnabled)
-                Call.State.Connected,
-                Call.State.StreamsRunning,
-                Call.State.Updating,
-                Call.State.UpdatedByRemote -> CallUi("Em chamada", remoto, ativa = true, comVideo = video)
-                Call.State.Paused -> CallUi("Em espera", remoto, ativa = true)
-                Call.State.Error -> CallUi("Erro: $message", remoto)
-                Call.State.End,
-                Call.State.Released -> CallUi().also { _camaraLigada.value = true; _altaVoz.value = false }
-                else -> _chamada.value
+            if (state == Call.State.End || state == Call.State.Released) {
+                if (core.callsNb == 0) { _camaraLigada.value = true; _altaVoz.value = false }
             }
-            _chamada.value = if (novo.remoto.isNotEmpty() && novo.nome.isEmpty()) novo.copy(nome = nome) else novo
+            _chamada.value = calcularUi(if (state == Call.State.Error) "Erro: $message" else null, call)
         }
+    }
+
+    private val terminadas = setOf(Call.State.End, Call.State.Released, Call.State.Error)
+
+    private fun numero(call: Call) = call.remoteAddress.username ?: call.remoteAddress.asStringUriOnly()
+
+    /**
+     * Estado para o ecrã, olhando para TODAS as chamadas: uma a tocar tem prioridade;
+     * depois a conferência; depois a chamada ativa (com a outra, se houver, em espera).
+     */
+    private fun calcularUi(erro: String?, ultima: Call?): CallUi {
+        val abertas = core.calls.filter { it.state !in terminadas }
+        if (abertas.isEmpty()) return if (erro != null && ultima != null) CallUi(erro, numero(ultima)) else CallUi()
+        val nomeDe = { c: Call -> c.remoteAddress.displayName?.takeIf { it.isNotBlank() && it != numero(c) } ?: "" }
+
+        abertas.firstOrNull { it.state == Call.State.IncomingReceived || it.state == Call.State.IncomingEarlyMedia }?.let { c ->
+            val oferece = c.remoteParams?.isVideoEnabled == true
+            val outra = abertas.firstOrNull { it != c }
+            return CallUi(if (oferece) "Videochamada a chegar" else "A receber chamada", numero(c),
+                aTocar = true, ofereceVideo = oferece, nome = nomeDe(c),
+                emEspera = outra?.let { numero(it) } ?: "", chamadas = abertas.size)
+        }
+
+        val conf = core.conference
+        if (conf != null && conf.isIn && conf.participantCount > 0) {
+            return CallUi("Em conferência", "Conferência", ativa = true, conferencia = true,
+                participantes = conf.participantCount + 1, chamadas = abertas.size)
+        }
+
+        val principal = core.currentCall?.takeIf { it.state !in terminadas }
+            ?: abertas.firstOrNull { it.state != Call.State.Paused } ?: abertas.first()
+        val outra = abertas.firstOrNull { it != principal }
+        val estado = when (principal.state) {
+            Call.State.OutgoingInit, Call.State.OutgoingProgress,
+            Call.State.OutgoingRinging, Call.State.OutgoingEarlyMedia -> "A chamar…"
+            Call.State.Paused, Call.State.Pausing -> "Em espera"
+            Call.State.PausedByRemote -> "Pôs-te em espera"
+            else -> "Em chamada"
+        }
+        val video = if (estado == "A chamar…") principal.params.isVideoEnabled else principal.currentParams.isVideoEnabled
+        return CallUi(estado, numero(principal), ativa = true, comVideo = video, nome = nomeDe(principal),
+            emEspera = outra?.let { numero(it) } ?: "", chamadas = abertas.size)
     }
 
     /** Junta a chamada que acabou ao registo. */
@@ -201,15 +236,67 @@ class SipManager(context: Context) {
 
     /** Atende; com [video] = true envia também a câmara (se a chamada trouxer vídeo). */
     fun atender(video: Boolean = false) {
-        val call = chamadaAtual() ?: return
+        val call = core.calls.firstOrNull { it.state == Call.State.IncomingReceived || it.state == Call.State.IncomingEarlyMedia }
+            ?: chamadaAtual() ?: return
+        // Chamada em espera: a que estava a decorrer fica em espera
+        core.calls.filter { it != call && it.state == Call.State.StreamsRunning }.forEach { it.pause() }
         val params = core.createCallParams(call) ?: run { call.accept(); return }
         params.isVideoEnabled = video && call.remoteParams?.isVideoEnabled == true
         _camaraLigada.value = true
         call.acceptWithParams(params)
     }
 
+    /** Recusa a chamada a tocar, ou desliga a chamada atual (ou a conferência inteira). */
     fun desligar() {
-        chamadaAtual()?.terminate()
+        core.calls.firstOrNull { it.state == Call.State.IncomingReceived || it.state == Call.State.IncomingEarlyMedia }
+            ?.let { it.decline(Reason.Declined); return }
+        val conf = core.conference
+        if (conf != null && conf.isIn) { conf.terminate(); return }
+        val call = chamadaAtual() ?: return
+        call.terminate()
+        // Se ficar uma chamada em espera, volta a ela
+        core.calls.firstOrNull { it != call && it.state == Call.State.Paused }?.resume()
+    }
+
+    private fun endereco(destino: String) =
+        core.interpretUrl(if (destino.startsWith("sip:")) destino else "sip:${destino.trim()}@$dominio")
+
+    /** Transferência direta: a pessoa com quem falo passa a falar com [destino] e eu saio. */
+    fun transferir(destino: String) {
+        val call = core.currentCall ?: return
+        endereco(destino)?.let { call.transferTo(it) }
+    }
+
+    /** Põe a chamada atual em espera e liga para outra extensão (para consultar, transferir ou juntar). */
+    fun adicionar(destino: String) {
+        core.currentCall?.pause()
+        chamar(destino)
+    }
+
+    /** Troca entre a chamada ativa e a que está em espera. */
+    fun alternar() {
+        val ativa = core.currentCall
+        val espera = core.calls.firstOrNull { it != ativa && it.state == Call.State.Paused } ?: return
+        ativa?.pause()
+        espera.resume()
+    }
+
+    /** Junta todas as chamadas numa conferência (o som é misturado neste telemóvel). */
+    fun juntar() {
+        val abertas = core.calls.filter { it.state !in terminadas }
+        if (abertas.size < 2) return
+        val params = core.createConferenceParams(null)
+        params.isVideoEnabled = false
+        val conf = core.conference ?: core.createConferenceWithParams(params) ?: return
+        conf.addParticipants(abertas.filter { it.conference == null }.toTypedArray())
+        conf.enter()
+    }
+
+    /** Transferência com consulta: liga a pessoa em espera à pessoa com quem estou a falar, e eu saio. */
+    fun ligarOsDois() {
+        val ativa = core.currentCall ?: return
+        val espera = core.calls.firstOrNull { it != ativa && it.state == Call.State.Paused } ?: return
+        espera.transferToAnother(ativa)
     }
 
     private fun usarBluetoothSeHouver(call: Call) {

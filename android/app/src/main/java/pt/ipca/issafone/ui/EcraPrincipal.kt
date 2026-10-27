@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -307,7 +309,21 @@ private fun ListaChamadas(vm: AppViewModel) {
 @Composable
 private fun PainelChamada(vm: AppViewModel, c: CallUi) {
     val contactos by vm.xmpp.contactos.collectAsState()
-    val nome = c.nome.ifBlank { contactos.firstOrNull { it.jid.substringBefore("@") == c.remoto }?.nome ?: c.remoto }
+    val nomeDe = { num: String -> contactos.firstOrNull { it.jid.substringBefore("@") == num }?.nome ?: num }
+    val nome = if (c.conferencia) "Conferência" else c.nome.ifBlank { nomeDe(c.remoto) }
+    // Escolher extensão para transferir ou acrescentar à chamada
+    var escolher by remember { mutableStateOf<String?>(null) }   // "transferir" ou "adicionar"
+    escolher?.let { acao ->
+        EscolherExtensao(
+            titulo = if (acao == "transferir") "Transferir para…" else "Ligar a mais alguém",
+            contactos = contactos,
+            aoFechar = { escolher = null },
+            aoEscolher = { ext ->
+                escolher = null
+                if (acao == "transferir") vm.sip.transferir(ext) else vm.sip.adicionar(ext)
+            }
+        )
+    }
     var mute by remember { mutableStateOf(false) }
     var teclas by remember { mutableStateOf(false) }
     val camaraLigada by vm.sip.camaraLigada.collectAsState()
@@ -350,7 +366,11 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
                 Spacer(Modifier.height(12.dp))
             }
             Text(nome, color = Color.White, fontSize = if (c.comVideo) 20.sp else 30.sp, textAlign = TextAlign.Center)
-            if (nome != c.remoto && !c.comVideo) Text(c.remoto, color = Color.LightGray)
+            if (c.conferencia) Text("${c.participantes} pessoas na chamada", color = Color.LightGray)
+            else if (nome != c.remoto && !c.comVideo) Text(c.remoto, color = Color.LightGray)
+            if (c.emEspera.isNotBlank() && !c.conferencia) {
+                Text("Em espera: ${nomeDe(c.emEspera)}", color = Color(0xFFFFD166), modifier = Modifier.padding(top = 4.dp))
+            }
             Text(
                 if (c.estado == "Em chamada") "%02d:%02d".format(segundos / 60, segundos % 60) else c.estado,
                 color = Color.LightGray, modifier = Modifier.padding(6.dp)
@@ -379,6 +399,23 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
                         BotaoRedondo("Vídeo", Color(0x33FFFFFF)) { vm.sip.alternarVideo() }
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                // Transferir e acrescentar pessoas à chamada
+                if (c.estado == "Em chamada" || c.conferencia) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (!c.conferencia) BotaoRedondo("Transferir", Color(0x33FFFFFF)) { escolher = "transferir" }
+                        BotaoRedondo("+ Adicionar", Color(0x33FFFFFF)) { escolher = "adicionar" }
+                    }
+                }
+                // Duas chamadas: alternar, juntar numa conferência ou ligá-las uma à outra
+                if (c.chamadas >= 2 && !c.conferencia && !c.aTocar) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BotaoRedondo("Alternar", Color(0x33FFFFFF)) { vm.sip.alternar() }
+                        BotaoRedondo("Juntar", Azul) { vm.sip.juntar() }
+                        BotaoRedondo("Ligar os 2", Color(0x33FFFFFF)) { vm.sip.ligarOsDois() }
+                    }
+                }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     BotaoRedondo(
@@ -390,6 +427,51 @@ private fun PainelChamada(vm: AppViewModel, c: CallUi) {
             }
         }
     }
+}
+
+/** Escolher uma extensão: escrever o número ou tocar num contacto. */
+@Composable
+private fun EscolherExtensao(
+    titulo: String,
+    contactos: List<pt.ipca.issafone.xmpp.Contacto>,
+    aoFechar: () -> Unit,
+    aoEscolher: (String) -> Unit
+) {
+    var numero by remember { mutableStateOf("") }
+    val lista = contactos.filter {
+        numero.isBlank() || it.nome.contains(numero, ignoreCase = true) || it.jid.substringBefore("@").startsWith(numero)
+    }
+    AlertDialog(
+        onDismissRequest = aoFechar,
+        title = { Text(titulo) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    numero, { numero = it }, singleLine = true,
+                    label = { Text("Extensão ou nome") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.heightIn(max = 280.dp)) {
+                    items(lista, key = { it.jid }) { ct ->
+                        val ext = ct.jid.substringBefore("@")
+                        ListItem(
+                            headlineContent = { Text(ct.nome) },
+                            supportingContent = { Text(ext + if (ct.online) " · ligado" else "") },
+                            modifier = Modifier.clickable { aoEscolher(ext) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { if (numero.isNotBlank()) aoEscolher(numero.trim()) }, enabled = numero.any { it.isDigit() }) {
+                Text("Ligar")
+            }
+        },
+        dismissButton = { TextButton(onClick = aoFechar) { Text("Cancelar") } }
+    )
 }
 
 @Composable
