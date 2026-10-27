@@ -70,6 +70,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pedirConversa(jid: String?) { _abrirConversa.value = jid }
 
     fun enviar(destino: String, texto: String) = viewModelScope.launch { xmpp.enviar(destino, texto) }
+
+    /** Progresso do anexo a enviar (0 a 1), ou null se não houver nenhum. */
+    private val _anexo = MutableStateFlow<Float?>(null)
+    val anexo: StateFlow<Float?> = _anexo
+
+    /** Envia um ficheiro escolhido pelo utilizador (fotografia, PDF, etc.). */
+    fun enviarAnexo(destino: String, uri: android.net.Uri) = viewModelScope.launch {
+        val ctx = getApplication<Application>()
+        _anexo.value = 0f
+        val ficheiro = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                var nome = "anexo"
+                ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0)?.let { nome = it }
+                }
+                // Nome seguro para o endereço (sem espaços nem caracteres estranhos)
+                nome = nome.replace(Regex("[^A-Za-z0-9._-]+"), "_").take(80).ifBlank { "anexo" }
+                val pasta = java.io.File(ctx.cacheDir, "anexos").apply { mkdirs() }
+                val f = java.io.File(pasta, "${System.currentTimeMillis()}_$nome")
+                ctx.contentResolver.openInputStream(uri)!!.use { entrada -> f.outputStream().use { entrada.copyTo(it) } }
+                // O nome que chega ao outro lado é o original (sem o prefixo de tempo)
+                java.io.File(pasta, nome).also { destinoF -> destinoF.delete(); f.renameTo(destinoF) }
+            }.getOrNull()
+        }
+        if (ficheiro == null) { _anexo.value = null; return@launch }
+        xmpp.enviarFicheiro(destino, ficheiro) { _anexo.value = it }
+        _anexo.value = null
+    }
     fun adicionarContacto(u: String) = viewModelScope.launch { xmpp.adicionarContacto(u) }
     fun removerContacto(jid: String, depois: (Boolean) -> Unit) =
         viewModelScope.launch { depois(xmpp.removerContacto(jid)) }

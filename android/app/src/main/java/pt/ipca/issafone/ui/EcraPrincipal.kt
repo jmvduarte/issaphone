@@ -91,7 +91,7 @@ fun EcraPrincipal(vm: AppViewModel) {
     val ultima = { jid: String ->
         mensagens.lastOrNull { it.contacto.equals(jid, ignoreCase = true) }?.let {
             val quem = if (it.enviada) "Tu: " else it.autor?.let { a -> "${vm.xmpp.nomeExt(a)}: " } ?: ""
-            UltimaMensagem(quem + it.texto, it.hora)
+            UltimaMensagem(quem + pt.ipca.issafone.xmpp.resumoMensagem(it.texto), it.hora)
         }
     }
 
@@ -641,6 +641,11 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
     var verMembros by remember { mutableStateOf(false) }
     var confirmarRemover by remember { mutableStateOf(false) }
     val contacto = contactos.firstOrNull { it.jid.equals(jid, ignoreCase = true) }
+    val progresso by vm.anexo.collectAsState()
+    val ctx = LocalContext.current
+    val escolherFicheiro = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { vm.enviarAnexo(jid, it) } }
 
     // O grupo deixou de existir (saímos, fomos removidos ou foi apagado)
     LaunchedEffect(ehGrupo, grupo) { if (ehGrupo && grupo == null && grupos.isNotEmpty()) onVoltar() }
@@ -661,7 +666,15 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
         onLigar = onLigar,
         onMembros = { verMembros = true },
         onRemover = { confirmarRemover = true },
-        onEnviar = { vm.enviar(jid, it) }
+        onEnviar = { vm.enviar(jid, it) },
+        onAnexar = { escolherFicheiro.launch("*/*") },
+        progressoAnexo = progresso,
+        onAbrirAnexo = { url ->
+            runCatching {
+                ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
     )
 
     if (verMembros && grupo != null) DialogoMembros(vm, grupo, onFechar = { verMembros = false }, onSaiu = onVoltar)
@@ -695,6 +708,9 @@ internal fun ConversaUi(
     onMembros: () -> Unit,
     onRemover: () -> Unit,
     onEnviar: (String) -> Unit,
+    onAnexar: () -> Unit = {},
+    progressoAnexo: Float? = null,
+    onAbrirAnexo: (String) -> Unit = {},
 ) {
     var texto by rememberSaveable { mutableStateOf("") }
     val lista = rememberLazyListState()
@@ -766,7 +782,9 @@ internal fun ConversaUi(
                             Text(nomeAutor(m.autor), color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                         }
-                        Text(m.texto, color = cor, style = MaterialTheme.typography.bodyLarge)
+                        val anexo = pt.ipca.issafone.xmpp.anexoDe(m.texto)
+                        if (anexo == null) Text(m.texto, color = cor, style = MaterialTheme.typography.bodyLarge)
+                        else BolhaAnexo(anexo, minha, onAbrirAnexo)
                         Text(hora.format(Date(m.hora)), color = cor.copy(alpha = .65f), fontSize = 11.sp,
                             modifier = Modifier.align(Alignment.End))
                     }
@@ -774,12 +792,23 @@ internal fun ConversaUi(
             }
         }
 
+        // A enviar um anexo
+        progressoAnexo?.let { p ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("A enviar anexo… ${(p * 100).toInt()}%", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(150.dp))
+                LinearProgressIndicator(progress = { p }, modifier = Modifier.weight(1f).clip(RoundedCornerShape(50)))
+            }
+        }
         // Escrever
         Row(
             Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)
                 .navigationBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = onAnexar, enabled = progressoAnexo == null) {
+                Icon(Icones.Anexo, "Anexar ficheiro", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             TextField(
                 texto, { texto = it }, placeholder = { Text("Mensagem") }, maxLines = 5,
                 shape = RoundedCornerShape(26.dp),
@@ -800,6 +829,45 @@ internal fun ConversaUi(
             ) {
                 Icon(Icones.Enviar, "Enviar",
                     tint = if (texto.isNotBlank()) Color.White else MaterialTheme.colorScheme.outline)
+            }
+        }
+    }
+}
+
+/** Anexo dentro de um balão: a imagem (ou um cartão com o nome do ficheiro). Tocar abre-o. */
+@Composable
+private fun BolhaAnexo(a: pt.ipca.issafone.xmpp.Anexo, minha: Boolean, onAbrir: (String) -> Unit) {
+    val cor = if (minha) Color.White else MaterialTheme.colorScheme.onSurface
+    if (a.imagem) {
+        coil.compose.SubcomposeAsyncImage(
+            model = a.url, contentDescription = a.nome,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            loading = {
+                Box(Modifier.fillMaxSize().background(cor.copy(alpha = .1f)), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp), color = cor, strokeWidth = 2.dp)
+                }
+            },
+            error = {
+                Box(Modifier.fillMaxSize().background(cor.copy(alpha = .1f)), contentAlignment = Alignment.Center) {
+                    Icon(Icones.Imagem, null, tint = cor.copy(alpha = .7f))
+                }
+            },
+            modifier = Modifier.padding(top = 2.dp, bottom = 4.dp).size(width = 230.dp, height = 170.dp)
+                .clip(RoundedCornerShape(14.dp)).clickable { onAbrir(a.url) }
+        )
+    } else {
+        Row(
+            Modifier.padding(top = 2.dp, bottom = 4.dp).clip(RoundedCornerShape(14.dp))
+                .background(cor.copy(alpha = .12f)).clickable { onAbrir(a.url) }.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(cor.copy(alpha = .18f)), contentAlignment = Alignment.Center) {
+                Icon(Icones.Ficheiro, null, tint = cor)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.widthIn(max = 180.dp)) {
+                Text(a.nome, color = cor, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+                Text("${a.extensao.ifBlank { "Ficheiro" }} · toca para abrir", color = cor.copy(alpha = .7f), fontSize = 12.sp)
             }
         }
     }

@@ -114,7 +114,8 @@ class IssaFoneService : Service() {
             vistas = lista.toSet()
             val visivel = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             if (!visivel) novas.forEach {
-                val texto = it.autor?.let { a -> "${app.xmpp.nomeExt(a)}: ${it.texto}" } ?: it.texto
+                val resumo = pt.ipca.issafone.xmpp.resumoMensagem(it.texto)
+                val texto = it.autor?.let { a -> "${app.xmpp.nomeExt(a)}: $resumo" } ?: resumo
                 Notificacoes.mensagem(this@IssaFoneService, it.contacto, app.xmpp.nomeDe(it.contacto), texto)
             }
         }

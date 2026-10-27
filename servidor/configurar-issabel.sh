@@ -78,7 +78,7 @@ else ok "$DOMINIO → $IP_DNS (IP público)"; fi
 # -----------------------------------------------------------------------------
 passo "2. Pacotes"
 yum install -y -q epel-release >/dev/null 2>&1
-if yum install -y -q certbot crudini mod_ssl openssl curl >/dev/null 2>&1; then ok "certbot, crudini, mod_ssl, openssl"
+if yum install -y -q certbot crudini mod_ssl openssl curl unzip >/dev/null 2>&1; then ok "certbot, crudini, mod_ssl, openssl"
 else falha "Não foi possível instalar pacotes (yum)"; fi
 
 # -----------------------------------------------------------------------------
@@ -166,6 +166,9 @@ SSLProxyCheckPeerExpire off
 # timeout alto: a ligação fica aberta e parada entre mensagens
 ProxyPass        /issafone-ws/sip  wss://127.0.0.1:8089/ws  timeout=3600
 ProxyPass        /issafone-ws/xmpp wss://127.0.0.1:7443/ws/ timeout=3600
+# Anexos do chat (plugin HTTP File Upload do Openfire)
+ProxyPass        /httpfileupload   https://127.0.0.1:7443/httpfileupload timeout=600
+ProxyPassReverse /httpfileupload   https://127.0.0.1:7443/httpfileupload
 EOF2
   copia "$SSL"
   if ! grep -q "issafone-ws.inc" "$SSL"; then
@@ -397,10 +400,10 @@ else
   [ -n "$N" ] && ok "$N extensões SIP encontradas (serão contas de chat)" || falha "Não consegui ler as extensões (asterisk.sip)"
 
   copia "$OF_CONF"
-  python - "$OF_CONF" "$OF_DB_PASS" <<'PY'
+  python - "$OF_CONF" "$OF_DB_PASS" "$DOMINIO" <<'PY'
 # -*- coding: utf-8 -*-
 import re, sys
-caminho, senha = sys.argv[1], sys.argv[2]
+caminho, senha, dominio = sys.argv[1], sys.argv[2], sys.argv[3]
 xml = open(caminho).read()
 xml = re.sub(r'\s*<!-- >>> IssaFone.*?<!-- <<< IssaFone -->', '', xml, flags=re.S)
 bloco = """
@@ -443,13 +446,36 @@ bloco = """
     <loadMembersSQL>SELECT id FROM sip WHERE keyword='secret' AND ?='IssaFone' ORDER BY id</loadMembersSQL>
     <loadAdminsSQL>SELECT id FROM sip WHERE 1=0 AND ?='IssaFone'</loadAdminsSQL>
   </jdbcGroupProvider>
+  <!-- Anexos no chat (plugin HTTP File Upload): ficheiros guardados no disco e servidos pela 443 -->
+  <plugin><httpfileupload><serverspecific>
+    <fileRepo>/var/lib/openfire-anexos</fileRepo>
+    <maxFileSize>52428800</maxFileSize>
+    <announcedWebProtocol>https</announcedWebProtocol>
+    <announcedWebHost>__DOMINIO__</announcedWebHost>
+    <announcedWebPort>443</announcedWebPort>
+    <announcedWebContextRoot>/httpfileupload</announcedWebContextRoot>
+  </serverspecific></httpfileupload></plugin>
   <!-- <<< IssaFone -->
 """ % senha
+bloco = bloco.replace('__DOMINIO__', dominio)
 xml = xml.replace('</jive>', bloco + '</jive>', 1)
 open(caminho, 'w').write(xml)
 PY
   chown daemon:daemon "$OF_CONF" 2>/dev/null
   ok "Openfire configurado para usar as extensões do Issabel"
+fi
+
+# Anexos no chat: plugin HTTP File Upload (1.4.2 é a última versão para o Openfire 4.x)
+mkdir -p /var/lib/openfire-anexos && chown daemon:daemon /var/lib/openfire-anexos 2>/dev/null
+PLUGIN=/opt/openfire/plugins/httpfileupload.jar
+if [ -f "$PLUGIN" ] || [ -d /opt/openfire/plugins/httpfileupload ]; then
+  ok "Plugin de anexos (HTTP File Upload) já instalado"
+elif curl -fsSL --max-time 60 "https://www.igniterealtime.org/projects/openfire/plugins/1.4.2/httpfileupload.jar" -o /tmp/httpfileupload.jar \
+     && unzip -tq /tmp/httpfileupload.jar >/dev/null 2>&1; then
+  mv /tmp/httpfileupload.jar "$PLUGIN"; chown daemon:daemon "$PLUGIN" 2>/dev/null
+  ok "Plugin de anexos (HTTP File Upload 1.4.2) instalado"
+else
+  falha "Não consegui descarregar o plugin de anexos. Instala-o no painel do Openfire: Plugins → Plugins disponíveis → HTTP File Upload"
 fi
 
 LOG_OF=/opt/openfire/logs/openfire.log

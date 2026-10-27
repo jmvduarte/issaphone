@@ -103,6 +103,10 @@ dependencies {
     // Chat XMPP -> Openfire
     implementation("org.igniterealtime.smack:smack-android-extensions:4.4.8")
     implementation("org.igniterealtime.smack:smack-tcp:4.4.8")
+    implementation("org.igniterealtime.smack:smack-experimental:4.4.8")   // anexos (HTTP File Upload)
+
+    // Pré-visualização das imagens recebidas no chat
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Testes das capturas de ecrã
     testImplementation("junit:junit:4.13.2")

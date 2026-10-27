@@ -38,6 +38,7 @@ class SipManager(context: Context) {
     private val factory = Factory.instance()
     private val core: Core = factory.createCore(null, null, context)
     private val rota = AudioRota(context)
+    private var videoAplicado: Boolean? = null   // já se escolheu a saída do som para esta chamada?
 
     private val _registo = MutableStateFlow("Desligado")
     val registo: StateFlow<String> = _registo
@@ -90,10 +91,23 @@ class SipManager(context: Context) {
             // Ao atender/ser atendido: se houver auriculares Bluetooth ligados, o som vai para lá
             if (state == Call.State.Connected) usarBluetoothSeHouver(call)
             // Som da chamada no Android: foco de áudio (pára a música) e Bluetooth do carro/auriculares
-            if (state == Call.State.StreamsRunning) rota.iniciar()
+            // (só da primeira vez e quando a chamada passa a ter/deixa de ter vídeo, para não
+            // desfazer o que a pessoa escolheu no botão Alta voz)
+            if (state == Call.State.StreamsRunning) {
+                val video = call.currentParams.isVideoEnabled
+                if (video != videoAplicado) {
+                    videoAplicado = video
+                    if (rota.iniciar(video)) {
+                        core.audioDevices.firstOrNull {
+                            it.type == AudioDevice.Type.Speaker && it.hasCapability(AudioDevice.Capabilities.CapabilityPlay)
+                        }?.let { call.outputAudioDevice = it }
+                        _altaVoz.value = true
+                    }
+                }
+            }
             if (state == Call.State.End || state == Call.State.Released) {
                 if (core.calls.none { it.state !in terminadas }) {
-                    _camaraLigada.value = true; _altaVoz.value = false; rota.terminar()
+                    _camaraLigada.value = true; _altaVoz.value = false; rota.terminar(); videoAplicado = null
                 }
             }
             _chamada.value = calcularUi(if (state == Call.State.Error) "Erro: $message" else null, call)

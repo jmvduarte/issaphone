@@ -39,6 +39,9 @@ object Icones {
     val Pesquisar = Icons.Rounded.Search
     val Fechar = Icons.Rounded.Close
     val Lixo = Icons.Rounded.DeleteOutline
+    val Anexo = Icons.Rounded.AttachFile
+    val Ficheiro = Icons.Rounded.Description
+    val Imagem = Icons.Rounded.Image
 
     // Menu
     val Atualizar = Icons.Rounded.SystemUpdate

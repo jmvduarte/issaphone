@@ -209,6 +209,32 @@ class XmppManager(context: Context) {
         }
     }
 
+    /**
+     * Envia um ficheiro: carrega-o para o Openfire (HTTP File Upload) e manda o endereço como
+     * mensagem. [progresso] vai de 0 a 1. O ficheiro temporário é apagado no fim.
+     */
+    suspend fun enviarFicheiro(destino: String, ficheiro: java.io.File, progresso: (Float) -> Unit): Boolean =
+        withContext(Dispatchers.IO) {
+            val con = ligacao ?: return@withContext false
+            try {
+                val mgr = org.jivesoftware.smackx.httpfileupload.HttpFileUploadManager.getInstanceFor(con)
+                if (!mgr.isUploadServiceDiscovered && !mgr.discoverUploadService()) {
+                    _aviso.value = "O servidor ainda não aceita anexos (falta o plugin HTTP File Upload no Openfire)."
+                    return@withContext false
+                }
+                val url = mgr.uploadFile(ficheiro) { enviados, total ->
+                    if (total > 0) progresso(enviados.toFloat() / total)
+                }
+                enviar(destino, url.toString())
+                true
+            } catch (e: Exception) {
+                _aviso.value = "Não foi possível enviar o anexo: ${e.message}"
+                false
+            } finally {
+                ficheiro.delete()
+            }
+        }
+
     /** Remove um contacto. Devolve false se não for possível (ex.: vem do grupo partilhado). */
     suspend fun removerContacto(jid: String): Boolean = withContext(Dispatchers.IO) {
         val con = ligacao ?: return@withContext false

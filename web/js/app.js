@@ -54,6 +54,43 @@ function lerConfigGuardada() {
   return c;
 }
 
+/* ======================= Anexos do chat (HTTP File Upload, XEP-0363) ======================= */
+
+// O ficheiro vai para o Openfire e a mensagem leva só o endereço; quem recebe mostra a imagem ou o ficheiro.
+const Anexos = {
+  de(texto) {
+    const t = (texto || '').trim();
+    if (!/^https?:\/\/\S+\/httpfileupload\/\S+$/.test(t)) return null;
+    let nome = t.split('/').pop().split('?')[0];
+    try { nome = decodeURIComponent(nome); } catch { /* fica como está */ }
+    const ext = (nome.split('.').pop() || '').toLowerCase();
+    return { url: t, nome, ext, imagem: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp'].includes(ext) };
+  },
+  resumo(texto) {
+    const a = this.de(texto);
+    return a ? (a.imagem ? '📷 Fotografia' : `📎 ${a.nome}`) : texto;
+  },
+  elemento(a) {
+    const link = document.createElement('a');
+    link.href = a.url; link.target = '_blank'; link.rel = 'noopener';
+    if (a.imagem) {
+      link.className = 'anexo-imagem';
+      const img = document.createElement('img');
+      img.src = a.url; img.alt = a.nome; img.loading = 'lazy';
+      img.onload = () => { const ol = $('#mensagens'); if (ol.scrollHeight - ol.scrollTop - ol.clientHeight < 400) ol.scrollTop = ol.scrollHeight; };
+      link.append(img);
+    } else {
+      link.className = 'anexo-ficheiro';
+      const ic = document.createElement('span'); ic.className = 'anexo-icone'; ic.textContent = (a.ext || 'ficheiro').slice(0, 4).toUpperCase();
+      const n = document.createElement('span'); n.className = 'anexo-nome'; n.textContent = a.nome;
+      const d = document.createElement('small'); d.textContent = 'Toca para abrir';
+      const info = document.createElement('span'); info.append(n, d);
+      link.append(ic, info);
+    }
+    return link;
+  },
+};
+
 /* ======================= Histórico do chat ======================= */
 
 const Historico = {
@@ -649,6 +686,41 @@ const Xmpp = {
     return true;
   },
 
+  /**
+   * Envia um ficheiro: pede ao Openfire um "lugar" (XEP-0363), carrega-o por HTTP PUT
+   * e manda o endereço como mensagem. [progresso] recebe valores de 0 a 1.
+   */
+  enviarFicheiro(para, ficheiro, progresso) {
+    return new Promise((resolve, reject) => {
+      if (!this.con?.connected) { reject(new Error('O chat não está ligado.')); return; }
+      const nome = ficheiro.name.replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80) || 'anexo';
+      const pedido = $iq({ type: 'get', to: `httpfileupload.${cfg.dominioXmpp}` })
+        .c('request', { xmlns: 'urn:xmpp:http:upload:0', filename: nome, size: ficheiro.size, 'content-type': ficheiro.type || 'application/octet-stream' });
+      this.con.sendIQ(pedido, (iq) => {
+        const put = iq.querySelector('put'); const get = iq.querySelector('get');
+        if (!put || !get) { reject(new Error('Resposta inválida do servidor.')); return; }
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', put.getAttribute('url'));
+        xhr.setRequestHeader('Content-Type', ficheiro.type || 'application/octet-stream');
+        put.querySelectorAll('header').forEach((h) => {
+          const n = h.getAttribute('name');
+          if (['Authorization', 'Cookie', 'Expires'].includes(n)) xhr.setRequestHeader(n, h.textContent);
+        });
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) progresso?.(e.loaded / e.total); };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) { this.enviar(para, get.getAttribute('url')); resolve(); }
+          else reject(new Error(`O servidor recusou o ficheiro (HTTP ${xhr.status}).`));
+        };
+        xhr.onerror = () => reject(new Error('Falha de rede ao enviar o ficheiro.'));
+        xhr.send(ficheiro);
+      }, (erro) => {
+        const texto = erro?.querySelector?.('text')?.textContent;
+        reject(new Error(texto || (erro ? 'O servidor não aceitou o ficheiro (é demasiado grande?).'
+          : 'O servidor ainda não aceita anexos (falta o plugin HTTP File Upload no Openfire).')));
+      }, 20000);
+    });
+  },
+
   /** Remove um contacto da lista (os do grupo partilhado não podem ser removidos). */
   remover(jid) {
     this.con.sendIQ(
@@ -1020,7 +1092,7 @@ const UI = {
   ultima(jid) {
     const u = Historico.de(jid).at(-1);
     if (!u) return null;
-    return (u.minha ? 'Tu: ' : u.autor ? `${this.nomeExt(u.autor)}: ` : '') + u.texto;
+    return (u.minha ? 'Tu: ' : u.autor ? `${this.nomeExt(u.autor)}: ` : '') + Anexos.resumo(u.texto);
   },
 
   contactos() {
@@ -1096,7 +1168,9 @@ const UI = {
         a.textContent = this.nomeExt(m.autor);
         li.append(a);
       }
-      li.append(document.createTextNode(m.texto));
+      const anexo = Anexos.de(m.texto);
+      if (anexo) { li.classList.add('com-anexo'); li.append(Anexos.elemento(anexo)); }
+      else li.append(document.createTextNode(m.texto));
       const t = document.createElement('time');
       t.textContent = (new Date(m.hora).toDateString() === hoje ? fmt : fmtDia).format(m.hora);
       li.append(t);
@@ -1113,7 +1187,7 @@ const UI = {
     this.contactos();
     if (!semAviso) {
       const titulo = this.nomeDe(de);
-      Avisos.mostrar(titulo, autor ? `${this.nomeExt(autor)}: ${texto}` : texto, 'msg-' + de, () => this.abrirConversa(de));
+      Avisos.mostrar(titulo, autor ? `${this.nomeExt(autor)}: ${Anexos.resumo(texto)}` : Anexos.resumo(texto), 'msg-' + de, () => this.abrirConversa(de));
     }
   },
 
@@ -1315,6 +1389,26 @@ function ligarEventos() {
     if (!Xmpp.con?.connected) { UI.aviso('O chat não está ligado.'); return; }
     Xmpp.adicionar(v);
     e.target.reset();
+  };
+
+  // Anexos
+  $('#btn-anexo').onclick = () => $('#ficheiro-anexo').click();
+  $('#ficheiro-anexo').onchange = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f || !UI.conversaCom) return;
+    if (f.size > 50 * 1024 * 1024) { UI.aviso('O ficheiro é demasiado grande (máximo 50 MB).'); return; }
+    const barra = $('#progresso-anexo');
+    barra.hidden = false; barra.value = 0;
+    $('#btn-anexo').disabled = true;
+    try {
+      await Xmpp.enviarFicheiro(UI.conversaCom, f, (p) => { barra.value = p; });
+      UI.mensagens(); UI.contactos();
+    } catch (erro) {
+      UI.aviso(`Não foi possível enviar o anexo: ${erro.message}`);
+    } finally {
+      barra.hidden = true; $('#btn-anexo').disabled = false;
+    }
   };
 
   $('#form-mensagem').onsubmit = (e) => {

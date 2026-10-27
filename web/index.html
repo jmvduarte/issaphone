@@ -136,7 +136,12 @@
         <button id="btn-remover-contacto" class="discreto perigo" hidden title="Remover contacto">Remover</button>
       </div>
       <ol id="mensagens" aria-live="polite"></ol>
+      <progress id="progresso-anexo" class="progresso-anexo" max="1" value="0" hidden></progress>
       <form id="form-mensagem" class="escrever" hidden>
+        <button type="button" id="btn-anexo" class="discreto anexar" title="Anexar ficheiro" aria-label="Anexar ficheiro">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.5 6.5v10.6a4.5 4.5 0 0 1-9 0V5.6a3 3 0 0 1 6 0v10.4a1.5 1.5 0 0 1-3 0V6.5H9v9.5a3 3 0 0 0 6 0V5.6a4.5 4.5 0 0 0-9 0v11.5a6 6 0 0 0 12 0V6.5z"/></svg>
+        </button>
+        <input type="file" id="ficheiro-anexo" hidden>
         <input name="texto" placeholder="Mensagem" autocomplete="off" aria-label="Mensagem">
         <button type="submit" class="primario">Enviar</button>
       </form>

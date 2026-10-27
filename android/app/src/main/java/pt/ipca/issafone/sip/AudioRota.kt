@@ -38,8 +38,20 @@ class AudioRota(context: Context) {
             am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
         }
 
-    /** Chamada atendida: foco de áudio + Bluetooth se houver. */
-    fun iniciar() {
+    /** Há auriculares (com fios, USB ou Bluetooth) ligados? */
+    fun temAuriculares(): Boolean = temBluetooth() ||
+        am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET || it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+        }
+
+    /**
+     * Chamada atendida: foco de áudio e saída do som. Em videochamada (sem auriculares)
+     * vai para o altifalante, como nas outras apps; em voz, Bluetooth ou auscultador.
+     * Devolve true se ficou em alta voz.
+     */
+    fun iniciar(video: Boolean = false): Boolean {
+        val altifalante = video && !temAuriculares()
         if (!ativa) {
             ativa = true
             foco = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
@@ -49,7 +61,8 @@ class AudioRota(context: Context) {
             am.mode = AudioManager.MODE_IN_COMMUNICATION
         }
         // Depois da Linphone ter escolhido a saída dela (senão podia voltar a pôr o auscultador)
-        handler.postDelayed({ if (ativa) usarAltifalante(false) }, 600)
+        handler.postDelayed({ if (ativa) usarAltifalante(altifalante) }, 600)
+        return altifalante
     }
 
     /**
