@@ -37,6 +37,7 @@ class SipManager(context: Context) {
 
     private val factory = Factory.instance()
     private val core: Core = factory.createCore(null, null, context)
+    private val rota = AudioRota(context)
 
     private val _registo = MutableStateFlow("Desligado")
     val registo: StateFlow<String> = _registo
@@ -88,8 +89,12 @@ class SipManager(context: Context) {
             if (state == Call.State.Released) registar(call, remoto)
             // Ao atender/ser atendido: se houver auriculares Bluetooth ligados, o som vai para lá
             if (state == Call.State.Connected) usarBluetoothSeHouver(call)
+            // Som da chamada no Android: foco de áudio (pára a música) e Bluetooth do carro/auriculares
+            if (state == Call.State.StreamsRunning) rota.iniciar()
             if (state == Call.State.End || state == Call.State.Released) {
-                if (core.callsNb == 0) { _camaraLigada.value = true; _altaVoz.value = false }
+                if (core.calls.none { it.state !in terminadas }) {
+                    _camaraLigada.value = true; _altaVoz.value = false; rota.terminar()
+                }
             }
             _chamada.value = calcularUi(if (state == Call.State.Error) "Erro: $message" else null, call)
         }
@@ -314,14 +319,17 @@ class SipManager(context: Context) {
     fun alternarAltaVoz() {
         val call = chamadaAtual() ?: return
         val ligar = !_altaVoz.value
+        val noBluetooth = rota.usarAltifalante(ligar)
         val saidas = core.audioDevices.filter { it.hasCapability(AudioDevice.Capabilities.CapabilityPlay) }
+        // O Android já pôs o som no Bluetooth e a Linphone não o conhece: não deixar que o troque pelo auscultador
+        if (noBluetooth && saidas.none { it.type == AudioDevice.Type.Bluetooth }) { _altaVoz.value = false; return }
         val destino = if (ligar) {
             saidas.firstOrNull { it.type == AudioDevice.Type.Speaker }
         } else {
             saidas.firstOrNull { it.type == AudioDevice.Type.Bluetooth }
                 ?: saidas.firstOrNull { it.type == AudioDevice.Type.Headset || it.type == AudioDevice.Type.Headphones }
                 ?: saidas.firstOrNull { it.type == AudioDevice.Type.Earpiece }
-        } ?: return
+        } ?: run { _altaVoz.value = ligar; return }
         call.outputAudioDevice = destino
         if (destino.type == AudioDevice.Type.Bluetooth) {
             core.audioDevices.firstOrNull {
