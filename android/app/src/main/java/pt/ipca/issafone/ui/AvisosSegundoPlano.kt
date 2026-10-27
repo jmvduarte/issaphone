@@ -71,14 +71,19 @@ fun AvisosSegundoPlano() {
 
     if (avisos.isEmpty()) return
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        modifier = Modifier.fillMaxWidth().padding(8.dp)
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = CorAviso.copy(alpha = .14f)),
+        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Falta autorizar", style = MaterialTheme.typography.titleSmall)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Icon(Icones.Aviso, null, tint = CorAviso)
+                Spacer(Modifier.width(10.dp))
+                Text("Falta autorizar", style = MaterialTheme.typography.titleSmall)
+            }
             avisos.forEach { a ->
-                Text(a.texto, style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick = {
+                Text(a.texto, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FilledTonalButton(onClick = {
                     runCatching { ctx.startActivity(a.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 }) { Text(a.botao) }
             }
