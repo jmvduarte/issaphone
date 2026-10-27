@@ -12,7 +12,7 @@ Projeto académico — CTESP Redes e Sistemas Informáticos, IPCA.
 |-------|------------|------------|------------------|
 | [`android/`](android/README.md) | Android 8+ | Kotlin, Jetpack Compose, Linphone, Smack | `.apk` (GitHub Actions, Linux) |
 | [`ios/`](ios/README.md) | iOS 16+ | Swift, SwiftUI, Linphone, XMPPFramework | `.ipa` sem assinatura (GitHub Actions, macOS) |
-| [`web/`](web/README.md) | PC e iPhone (browser) | HTML/JS, JsSIP (WebRTC), Strophe.js | GitHub Pages: https://jmvduarte.github.io/issaphone/ |
+| [`web/`](web/README.md) | PC e iPhone (browser) | HTML/JS, JsSIP (WebRTC), Strophe.js | GitHub Pages: IssaFone https://jmvduarte.github.io/issaphone/ · IssaLink https://jmvduarte.github.io/issaphone/issalink/ |
 
 A configuração do servidor Issabel está no [guia passo a passo](GUIA-SERVIDOR.md).
 
@@ -28,6 +28,7 @@ Resumo:
 3. `DOMINIO=o.teu.dominio bash configurar-issabel.sh`
 4. Extensões 100–150 (app) e 200–250 (webapp) criadas no Issabel.
 5. `IssaLink.apk` da Release `issalink-N` mais recente, em [Releases](https://github.com/jmvduarte/issaphone/releases).
+6. Webapp do IssaLink: `https://O_TEU_DOMINIO/issalink/`, instalada pelo script, ou https://jmvduarte.github.io/issaphone/issalink/, que pede o servidor.
 
 ## Enviar para o GitHub
 

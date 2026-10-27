@@ -15,11 +15,15 @@ let cfg = null;
 
 // Servidor pré-configurado. Se a webapp estiver alojada no próprio Issabel
 // (https://dominio/issafone/), usa o domínio da página.
-// No GitHub Pages a webapp é a versão genérica (IssaLink): pede o servidor a quem entra.
+// Marca (js/marca.js): IssaFone usa o servidor do projeto quando não está alojada no Issabel;
+// IssaLink pede o servidor (no GitHub Pages) ou usa o domínio da página (no Issabel de cada um).
+const MARCA = window.MARCA || { nome: 'IssaFone', pedirServidor: false };
 const SERVIDOR_PROJETO = 'rsi-a36357.ddns.net';
-const GENERICA = /github\.io$/.test(location.hostname) || new URLSearchParams(location.search).has('generica');
-const SERVIDOR_PADRAO = GENERICA ? '' : /(^localhost$|^127\.)/.test(location.hostname) ? SERVIDOR_PROJETO : location.hostname;
-const NOME_APP = GENERICA ? 'IssaLink' : 'IssaFone';
+const GENERICA = Boolean(MARCA.pedirServidor) || new URLSearchParams(location.search).has('generica');
+const NOME_APP = MARCA.nome || 'IssaFone';
+const SERVIDOR_PADRAO = GENERICA ? ''
+  : (/(^localhost$|^127\.|github\.io$)/.test(location.hostname) && NOME_APP === 'IssaFone') ? SERVIDOR_PROJETO
+  : location.hostname;
 
 const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* modo privado */ } };
 const ler = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -1512,11 +1516,11 @@ function verificarRequisitos() {
 
 /** Versão genérica: o campo do servidor passa para o topo do formulário e é obrigatório. */
 function prepararGenerica() {
-  if (!GENERICA) return;
   document.title = NOME_APP;
   $('.marca h1').textContent = NOME_APP;
-  $('.marca .sub').textContent = 'Chamadas e chat para a tua central Issabel';
   $('.topo .titulo strong').textContent = NOME_APP;
+  if (NOME_APP !== 'IssaFone') $('.marca .sub').textContent = 'Chamadas e chat para a tua central Issabel';
+  if (!GENERICA) return;
   const rotulo = $('#form-login input[name="servidor"]').closest('label');
   rotulo.firstChild.textContent = 'Servidor';
   const campo = rotulo.querySelector('input');

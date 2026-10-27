@@ -11,7 +11,7 @@
 #   6. Openfire: certificado + contas de chat = extensões do Issabel
 #      (autentica na base de dados do Issabel: mesma palavra-passe)
 #   7. Firewall
-#   8. Instala a webapp em https://DOMINIO/issafone/
+#   8. Instala a webapp em https://DOMINIO/issafone/ (projeto) ou /issalink/ (outros servidores)
 #   9. Notificações push das chamadas na webapp
 #  10. Verificação final
 #
@@ -36,6 +36,8 @@ if [ -z "$DOMINIO" ]; then
 fi
 [ -n "$DOMINIO" ] || { echo "Indica o domínio: DOMINIO=pbx.empresa.pt bash configurar-issabel.sh"; exit 1; }
 mkdir -p /etc/issafone && echo "$DOMINIO" > /etc/issafone/dominio
+# Webapp: "issafone" no servidor do projeto; "issalink" (versão genérica) em qualquer outro Issabel
+MARCA="${MARCA:-$([ "$DOMINIO" = rsi-a36357.ddns.net ] && echo issafone || echo issalink)}"
 EXT_WEB="${EXT_WEB:-200-250}"          # extensões da webapp (intervalo ou lista: 201,202)
 REDE_LOCAL="${REDE_LOCAL:-192.168.0.0/16}"
 EMAIL="${EMAIL:-}"                     # opcional: avisos de expiração do Let's Encrypt
@@ -535,10 +537,10 @@ service iptables save >/dev/null 2>&1 && ok "Regras guardadas (80, 443, 5061, 80
 aviso "Se usares o Firewall na página do Issabel, acrescenta lá as mesmas portas (ao aplicá-lo, pode substituir estas regras)"
 
 # -----------------------------------------------------------------------------
-passo "9. Webapp em https://$DOMINIO/issafone/"
+passo "9. Webapp em https://$DOMINIO/$MARCA/"
 # Instala o atualizador (de 15 em 15 minutos fica igual à versão do GitHub)
-if curl -fsSL "https://raw.githubusercontent.com/$REPO/main/servidor/atualizar-webapp.sh" | REPO="$REPO" bash -s instalar | sed 's/^/  /'; then
-  ok "Webapp instalada em /var/www/html/issafone (atualiza-se sozinha)"
+if curl -fsSL "https://raw.githubusercontent.com/$REPO/main/servidor/atualizar-webapp.sh" | REPO="$REPO" MARCA="$MARCA" bash -s instalar | sed 's/^/  /'; then
+  ok "Webapp instalada em /var/www/html/$MARCA (atualiza-se sozinha)"
 else
   falha "Não foi possível instalar a webapp a partir do GitHub"
 fi
@@ -629,8 +631,8 @@ verificar_tls 5061 "Asterisk SIP/TLS (apps)"
 verificar_tls 7443 "Openfire WebSocket"
 CODE=$(curl -s --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone-push/?acao=chave")
 echo "$CODE" | grep -q '"chave":"B' && ok "Serviço de push responde" || falha "O serviço de push não responde ($CODE)"
-CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/issafone/")
-[ "$CODE" = 200 ] && ok "https://$DOMINIO/issafone/ responde" || falha "A webapp respondeu HTTP $CODE"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMINIO:443:127.0.0.1" "https://$DOMINIO/$MARCA/")
+[ "$CODE" = 200 ] && ok "https://$DOMINIO/$MARCA/ responde" || falha "A webapp respondeu HTTP $CODE"
 verificar_ws() { # caminho, protocolo, nome
   local c
   c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 --resolve "$DOMINIO:443:127.0.0.1" \
@@ -654,7 +656,7 @@ No router, redireciona para $(hostname -I | awk '{print $1}'):
   TCP 80, 443, 5061, 5222, 7443, 8089   e   UDP 5060, 10000-20000
   (a webapp também funciona só com a 443, para redes que bloqueiam 8089/7443)
 
-Webapp:        https://$DOMINIO/issafone/   (extensões $EXT_WEB)
+Webapp:        https://$DOMINIO/$MARCA/   (extensões $EXT_WEB)
 Apps:          entrar com o número da extensão e a respetiva palavra-passe (secret)
 Chat:          cada extensão do Issabel já é uma conta de chat, com a mesma palavra-passe.
                Lista de contactos automática: no Openfire, Utilizadores/Grupos → Grupos →

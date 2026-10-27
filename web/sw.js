@@ -5,6 +5,7 @@ const FICHEIROS = [
   './',
   'index.html',
   'css/app.css',
+  'js/marca.js',
   'js/app.js',
   'vendor/jssip-3.13.9.min.js',
   'vendor/strophe-3.1.1.min.js',

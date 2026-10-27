@@ -5,7 +5,7 @@ Este guia serve para quem quer usar o **IssaLink** (app Android), a **webapp** (
 - chamadas de voz e vídeo **cifradas** (SIP sobre TLS + SRTP);
 - chat interno com grupos, anexos e histórico (Openfire);
 - contactos automáticos: cada extensão criada no Issabel aparece sozinha na lista de todos;
-- webapp em `https://O_TEU_DOMINIO/issafone/`, com notificações de chamadas no iPhone.
+- webapp em `https://O_TEU_DOMINIO/issalink/`, com notificações de chamadas no iPhone.
 
 Tempo estimado: 45–60 minutos.
 
@@ -132,7 +132,7 @@ O script faz tudo o resto sozinho (e pode ser corrido de novo sempre que quisere
 - Openfire a usar as **extensões do Issabel como contas de chat** (mesma palavra-passe);
 - plugin de **anexos** do chat (até 50 MB);
 - **notificações push** para a webapp no iPhone;
-- **webapp** em `https://O_TEU_DOMINIO/issafone/`, atualizada automaticamente;
+- **webapp** em `https://O_TEU_DOMINIO/issalink/`, atualizada automaticamente;
 - regras de **firewall**.
 
 No fim aparece um resumo. O objetivo é **"Tudo configurado."**. Se aparecer algum ✘, vê a secção [Problemas comuns](#9-problemas-comuns).
@@ -181,8 +181,8 @@ Carrega em **Submit** e depois no botão vermelho **Apply Config**. Em poucos se
 4. No topo deve aparecer **Telefone · registado** e **Chat · ligado**. A app atualiza-se sozinha.
 
 ### PC e iPhone: webapp
-1. Abre `https://O_TEU_DOMINIO/issafone/` (instalada pelo script no teu servidor) e entra com uma extensão **200–250**.
-   Em alternativa, há uma versão alojada no GitHub que pede o servidor: **https://jmvduarte.github.io/issaphone/**. O endereço do teu próprio servidor funciona melhor: os anexos e as redes que só deixam passar a porta 443 só funcionam aí.
+1. Abre `https://O_TEU_DOMINIO/issalink/` (instalada pelo script no teu servidor) e entra com uma extensão **200–250**.
+   Em alternativa, há uma versão alojada no GitHub que pede o servidor: **https://jmvduarte.github.io/issaphone/issalink/**. O endereço do teu próprio servidor funciona melhor: os anexos e as redes que só deixam passar a porta 443 só funcionam aí.
 2. **iPhone:** no Safari, *Partilhar → Adicionar ao ecrã principal*, abre a webapp pelo ícone e toca no 🔔 para ativar as notificações (é assim que recebes chamadas com a página fechada).
 
 ---

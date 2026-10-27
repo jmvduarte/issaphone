@@ -28,14 +28,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cada publicação muda a versão da cache do service worker,
-      # para os browsers irem buscar os ficheiros novos.
-      - name: Versão da cache
-        run: sed -i "s/const VERSAO = '.*';/const VERSAO = 'issafone-${GITHUB_SHA::8}';/" web/sw.js
+      # Duas webapps separadas:
+      #   /issaphone/           → IssaFone (servidor do projeto)
+      #   /issaphone/issalink/  → IssaLink (genérica: pede o servidor)
+      - name: Preparar IssaFone e IssaLink
+        run: |
+          mkdir -p _site/issalink
+          cp -a web/. _site/
+          cp -a web/. _site/issalink/
+          sh web/marcar.sh _site/issalink IssaLink true
+          rm -f _site/marcar.sh _site/issalink/marcar.sh
+          # Cada publicação muda a versão da cache do service worker (os browsers vão buscar os ficheiros novos)
+          sed -i "s/const VERSAO = '.*';/const VERSAO = 'issafone-${GITHUB_SHA::8}';/" _site/sw.js
+          sed -i "s/const VERSAO = '.*';/const VERSAO = 'issalink-${GITHUB_SHA::8}';/" _site/issalink/sw.js
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
       - id: deploy
         uses: actions/deploy-pages@v4

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-#  IssaFone — mantém a webapp do servidor (https://DOMINIO/issafone/) igual à
+#  IssaFone/IssaLink — mantém a webapp do servidor (https://DOMINIO/issafone/ ou /issalink/) igual à
 #  última versão do GitHub. Só descarrega quando há alterações.
 #
 #  Instalar (uma vez, como root) — atualiza já e fica a verificar de 15 em 15 min:
@@ -9,12 +9,15 @@
 #  Atualizar à mão a qualquer momento:   issafone-atualizar-web
 # =============================================================================
 REPO="${REPO:-jmvduarte/issaphone}"
-DEST="${DEST:-/var/www/html/issafone}"
+# Marca da webapp: "issafone" (servidor do projeto) ou "issalink" (qualquer outro Issabel)
+MARCA="${MARCA:-$(cat /etc/issafone/marca 2>/dev/null || echo issafone)}"
+DEST="${DEST:-/var/www/html/$MARCA}"
 EXE=/usr/local/sbin/issafone-atualizar-web
 
 if [ "${1:-}" = "instalar" ]; then
   curl -fsSL "https://raw.githubusercontent.com/$REPO/main/servidor/atualizar-webapp.sh" -o "$EXE" && chmod +x "$EXE" \
     || { echo "Não foi possível descarregar o atualizador"; exit 1; }
+  mkdir -p /etc/issafone && echo "$MARCA" > /etc/issafone/marca
   echo "*/15 * * * * root $EXE >/dev/null 2>&1" > /etc/cron.d/issafone-web
   echo "✔ Atualizador instalado ($EXE, verifica de 15 em 15 minutos)"
   exec "$EXE" --mostrar
@@ -38,8 +41,10 @@ curl -fsSL --max-time 120 "https://github.com/$REPO/archive/$SHA.tar.gz" | tar x
 rm -rf "$DEST.novo"
 cp -a "$TMP"/*/web "$DEST.novo"
 echo "$SHA" > "$DEST.novo/.versao"
+[ "$MARCA" = issalink ] && sh "$DEST.novo/marcar.sh" "$DEST.novo" IssaLink false
+rm -f "$DEST.novo/marcar.sh"
 # Versão nova da cache do service worker: os browsers vão buscar os ficheiros novos
-sed -i "s/const VERSAO = '.*';/const VERSAO = 'issafone-${SHA:0:8}';/" "$DEST.novo/sw.js"
+sed -i "s/const VERSAO = '.*';/const VERSAO = '$MARCA-${SHA:0:8}';/" "$DEST.novo/sw.js"
 chown -R asterisk:asterisk "$DEST.novo" 2>/dev/null
 
 # Troca quase instantânea (sem ficar a meio para quem está a usar)
