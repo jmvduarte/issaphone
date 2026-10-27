@@ -76,6 +76,8 @@ class SipManager(context: Context) {
             if (video || call.remoteParams?.isVideoEnabled == true && state == Call.State.IncomingReceived ||
                 (state == Call.State.OutgoingInit && call.params.isVideoEnabled)) videoNaChamada = true
             if (state == Call.State.Released) registar(call, remoto)
+            // Ao atender/ser atendido: se houver auriculares Bluetooth ligados, o som vai para lá
+            if (state == Call.State.Connected) usarBluetoothSeHouver(call)
             val nome = call.remoteAddress.displayName?.takeIf { it.isNotBlank() && it != remoto } ?: ""
             val novo = when (state) {
                 Call.State.IncomingReceived -> {
@@ -210,6 +212,17 @@ class SipManager(context: Context) {
         chamadaAtual()?.terminate()
     }
 
+    private fun usarBluetoothSeHouver(call: Call) {
+        val bt = core.audioDevices.firstOrNull {
+            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(AudioDevice.Capabilities.CapabilityPlay)
+        } ?: return
+        call.outputAudioDevice = bt
+        core.audioDevices.firstOrNull {
+            it.type == AudioDevice.Type.Bluetooth && it.hasCapability(AudioDevice.Capabilities.CapabilityRecord)
+        }?.let { call.inputAudioDevice = it }
+        _altaVoz.value = false
+    }
+
     /** Liga/desliga a alta voz. Ao desligar, usa os auriculares (Bluetooth/fios) se houver, senão o auscultador. */
     fun alternarAltaVoz() {
         val call = chamadaAtual() ?: return
@@ -223,6 +236,11 @@ class SipManager(context: Context) {
                 ?: saidas.firstOrNull { it.type == AudioDevice.Type.Earpiece }
         } ?: return
         call.outputAudioDevice = destino
+        if (destino.type == AudioDevice.Type.Bluetooth) {
+            core.audioDevices.firstOrNull {
+                it.type == AudioDevice.Type.Bluetooth && it.hasCapability(AudioDevice.Capabilities.CapabilityRecord)
+            }?.let { call.inputAudioDevice = it }
+        }
         _altaVoz.value = ligar
     }
 
