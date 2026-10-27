@@ -57,16 +57,33 @@ class IssaFoneService : Service() {
         return START_STICKY
     }
 
-    private fun entrarEmPrimeiroPlano(estado: String) {
-        val tipo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private var ultimoEstado = "IssaFone"
+
+    /**
+     * Fora das chamadas o serviço é só "specialUse". Durante uma chamada passa a declarar
+     * também microfone (e câmara, em vídeo): sem isso, o Android corta o microfone quando o
+     * ecrã desliga ou se muda de app, e o outro lado deixa de nos ouvir a meio da chamada.
+     */
+    private fun entrarEmPrimeiroPlano(estado: String = ultimoEstado, emChamada: Boolean = false, video: Boolean = false) {
+        ultimoEstado = estado
+        val base = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-        ServiceCompat.startForeground(this, Notificacoes.ID_SERVICO, Notificacoes.servico(this, estado), tipo)
+        val micro = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && emChamada)
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        val camara = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && emChamada && video)
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0
+        val notif = Notificacoes.servico(this, estado)
+        // Tenta o mais completo; se o Android recusar (ex.: sem permissão da câmara), vai reduzindo
+        for (tipo in listOf(base or micro or camara, base or micro, base)) {
+            if (runCatching { ServiceCompat.startForeground(this, Notificacoes.ID_SERVICO, notif, tipo) }.isSuccess) return
+        }
     }
 
     /** Atualiza o texto da notificação permanente com o estado SIP/XMPP. */
     private fun observarEstado() = scope.launch {
         combine(app.sip.registo, app.xmpp.estado) { sip, chat -> "Telefone: $sip · Chat: ${chat.take(40)}" }
             .collect { texto ->
+                ultimoEstado = texto
                 runCatching {
                     NotificationManagerCompat.from(this@IssaFoneService)
                         .notify(Notificacoes.ID_SERVICO, Notificacoes.servico(this@IssaFoneService, texto))
@@ -75,7 +92,10 @@ class IssaFoneService : Service() {
     }
 
     private fun observarChamadas() = scope.launch {
+        var tipoAtual: Pair<Boolean, Boolean>? = null
         app.sip.chamada.collect { c ->
+            val pedido = Pair(c.ativa, c.ativa && c.comVideo)
+            if (pedido != tipoAtual) { tipoAtual = pedido; entrarEmPrimeiroPlano(emChamada = pedido.first, video = pedido.second) }
             if (c.aTocar) Notificacoes.chamadaRecebida(
                 this@IssaFoneService, c.nome.ifBlank { app.xmpp.nomeExt(c.remoto) }, c.ofereceVideo
             )
