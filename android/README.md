@@ -13,41 +13,7 @@ App Android (Kotlin + Jetpack Compose) que junta, numa só aplicação:
 
 ## 1. Preparar o Issabel 4
 
-### 1.1 Extensões (chamadas)
-1. *PBX → PBX Configuration → Extensions → Add Extension* (tipo **SIP**, chan_sip).
-2. Define a extensão (ex.: `101`) e o campo **secret** (é assim que o Issabel chama à palavra-passe da extensão). É esta a palavra-passe que pões na app.
-3. Em *Device Options* deixa `nat=yes` e `qualify=yes`.
-4. Cria pelo menos duas extensões (101 e 102) para testar chamadas entre telemóveis.
-
-### 1.2 Openfire (chat)
-O Issabel 4 não traz o Openfire ativo por defeito. Na consola do servidor (SSH como root):
-
-```bash
-# Java (o Openfire 4.7 funciona com Java 11)
-yum install -y java-11-openjdk
-
-# Descarregar o RPM do Openfire a partir de https://www.igniterealtime.org/downloads/
-# e instalar:
-yum localinstall -y openfire-4.7.*.noarch.rpm
-systemctl enable --now openfire
-```
-
-Depois abre `http://IP_DO_ISSABEL:9090` e conclui o assistente:
-- **XMPP Domain**: podes deixar o hostname ou usar o IP. Anota-o, porque é o campo "XMPP Domain" da app.
-- Base de dados: *Embedded Database* chega para o projeto.
-- Em *Users/Groups → Create New User*, cria utilizadores com o **mesmo nome das extensões** (101, 102…). Se lhes deres a mesma palavra-passe da extensão, na app basta preencher a palavra-passe da extensão.
-- (Opcional) Em *Users/Groups → Groups*, cria um grupo "Empresa", ativa *Contact List (Roster) Sharing* e mete lá todos. Assim os colegas aparecem automaticamente na lista da app.
-- Em *Server Settings → Client Connections*, mantém o STARTTLS como **opcional**. A app liga sem TLS por defeito porque o certificado do Openfire é autoassinado.
-
-### 1.3 Firewall do Issabel
-Em *Security → Firewall* (ou `firewall-cmd`), garante que estão abertas:
-
-| Porta | Protocolo | Uso |
-|-------|-----------|-----|
-| 5060 | UDP | SIP |
-| 10000-20000 | UDP | Áudio (RTP) |
-| 5222 | TCP | Chat XMPP |
-| 9090 | TCP | Consola Openfire (só rede interna) |
+Segue o **[guia passo a passo](../GUIA-SERVIDOR.md)**: domínio, portas, Openfire, script de configuração e extensões.
 
 ## 2. Compilar a app
 
