@@ -57,7 +57,7 @@ class IssaFoneService : Service() {
         return START_STICKY
     }
 
-    private var ultimoEstado = "IssaFone"
+    private var ultimoEstado = pt.ipca.issafone.BuildConfig.NOME_APP
 
     /**
      * Fora das chamadas o serviço é só "specialUse". Durante uma chamada passa a declarar

@@ -16,6 +16,19 @@ Projeto académico — CTESP Redes e Sistemas Informáticos, IPCA.
 
 A configuração do servidor Issabel (extensões, Openfire, firewall) está em [`android/README.md`](android/README.md).
 
+## IssaLink: usar na tua própria central Issabel
+
+O **IssaLink** é a mesma app Android, mas **sem os dados do Issabel do projeto**: no ecrã de entrada pede o endereço do servidor, a extensão e a palavra-passe. Pode ficar instalada ao lado do IssaFone.
+
+1. **Servidor (Issabel 4 / CentOS 7):** instala o Openfire, conclui o assistente na porta 9090 e corre, como root:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/jmvduarte/issaphone/main/servidor/configurar-issabel.sh -o configurar-issabel.sh
+   DOMINIO=pbx.empresa.pt bash configurar-issabel.sh
+   ```
+   O domínio tem de apontar para o IP público do Issabel. No router, redireciona TCP 80, 443, 5061, 5222, 7443 e 8089 e UDP 5060 e 10000–20000. Os detalhes estão em [`servidor/README.md`](servidor/README.md).
+2. **Telemóvel:** descarrega o `IssaLink.apk` da Release `issalink-N` mais recente, em [Releases](https://github.com/jmvduarte/issaphone/releases). A app atualiza-se sozinha a partir daí.
+3. **Webapp:** fica disponível em `https://O_TEU_DOMINIO/issafone/`, nas extensões 200–250.
+
 ## Enviar para o GitHub
 
 1. Em github.com, cria um repositório **vazio** chamado `IssaFone`, sem README nem .gitignore. Torna-o **público** se quiseres os minutos de macOS grátis.

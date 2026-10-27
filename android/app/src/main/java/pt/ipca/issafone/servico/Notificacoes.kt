@@ -68,7 +68,7 @@ object Notificacoes {
     fun servico(ctx: Context, estado: String): Notification =
         NotificationCompat.Builder(ctx, CANAL_SERVICO)
             .setSmallIcon(R.drawable.ic_stat_issafone)
-            .setContentTitle("IssaFone ativo")
+            .setContentTitle("${pt.ipca.issafone.BuildConfig.NOME_APP} ativo")
             .setContentText(estado)
             .setContentIntent(abrirApp(ctx, 10))
             .setOngoing(true)
@@ -89,7 +89,7 @@ object Notificacoes {
         val n = NotificationCompat.Builder(ctx, CANAL_CHAMADAS)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setContentTitle((if (video) "Videochamada de " else "Chamada de ") + remoto)
-            .setContentText("IssaFone")
+            .setContentText(pt.ipca.issafone.BuildConfig.NOME_APP)
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(pessoa, recusar, atender))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)

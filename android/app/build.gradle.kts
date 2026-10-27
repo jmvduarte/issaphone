@@ -20,11 +20,33 @@ android {
         versionCode = build
         versionName = "1.0.$build"
 
-        // Repositório onde a app procura atualizações (Releases "android-N")
+        // Repositório onde a app procura atualizações (Releases do GitHub)
         buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issaphone\"")
+    }
 
-        // Servidor Issabel pré-configurado: o ecrã de entrada só pede extensão e palavra-passe
-        buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
+    // Duas apps a partir do mesmo código:
+    //  - IssaFone: já vem configurada para o Issabel do projeto (só pede extensão e palavra-passe)
+    //  - IssaLink: genérica, para qualquer Issabel (pede também o endereço do servidor)
+    flavorDimensions += "marca"
+    productFlavors {
+        create("issafone") {
+            dimension = "marca"
+            applicationId = "pt.ipca.issafone"
+            resValue("string", "app_name", "IssaFone")
+            buildConfigField("String", "NOME_APP", "\"IssaFone\"")
+            buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
+            buildConfigField("String", "PREFIXO_RELEASE", "\"android-\"")
+            buildConfigField("String", "NOME_APK", "\"IssaFone-debug.apk\"")
+        }
+        create("issalink") {
+            dimension = "marca"
+            applicationId = "pt.ipca.issalink"
+            resValue("string", "app_name", "IssaLink")
+            buildConfigField("String", "NOME_APP", "\"IssaLink\"")
+            buildConfigField("String", "SERVIDOR_PADRAO", "\"\"")
+            buildConfigField("String", "PREFIXO_RELEASE", "\"issalink-\"")
+            buildConfigField("String", "NOME_APK", "\"IssaLink.apk\"")
+        }
     }
 
     buildFeatures {

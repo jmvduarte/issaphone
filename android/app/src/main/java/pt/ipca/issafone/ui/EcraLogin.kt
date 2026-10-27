@@ -40,6 +40,7 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
 
     // Opções avançadas (já vêm preenchidas para o servidor do projeto)
     var avancado by remember { mutableStateOf(false) }
+    val generica = BuildConfig.SERVIDOR_PADRAO.isBlank()
     var servidor by remember { mutableStateOf(atual.servidor.ifBlank { BuildConfig.SERVIDOR_PADRAO }) }
     var dominio by remember { mutableStateOf(atual.dominioXmpp) }
     var passXmpp by remember { mutableStateOf(atual.passwordXmpp) }
@@ -69,7 +70,7 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
                     .border(2.dp, Color.White.copy(alpha = .6f), RoundedCornerShape(26.dp))
             )
             Spacer(Modifier.height(18.dp))
-            Text("IssaFone", color = Color.White, style = MaterialTheme.typography.headlineMedium)
+            Text(BuildConfig.NOME_APP, color = Color.White, style = MaterialTheme.typography.headlineMedium)
             Text("Chamadas e chat da tua empresa", color = Color.White.copy(alpha = .85f), fontSize = 15.sp)
             Spacer(Modifier.height(32.dp))
 
@@ -83,8 +84,17 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text("Entrar", style = MaterialTheme.typography.headlineSmall)
-                Text("Usa o número da tua extensão e a respetiva palavra-passe.",
+                Text(
+                    if (generica) "Indica o endereço da tua central Issabel, o número da tua extensão e a respetiva palavra-passe."
+                    else "Usa o número da tua extensão e a respetiva palavra-passe.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Versão genérica (IssaLink): o servidor é pedido logo aqui
+                if (generica) OutlinedTextField(
+                    servidor, { servidor = it.trim() }, label = { Text("Servidor (ex.: pbx.empresa.pt)") },
+                    leadingIcon = { Icon(Icones.Servidor, null) },
+                    singleLine = true, shape = forma, modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next)
+                )
                 OutlinedTextField(
                     utilizador, { utilizador = it.trim() }, label = { Text("Extensão") },
                     leadingIcon = { Icon(Icones.Teclado, null) },
@@ -113,7 +123,7 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
                     Text(if (avancado) "Esconder opções avançadas" else "Opções avançadas")
                 }
                 if (avancado) {
-                    OutlinedTextField(
+                    if (!generica) OutlinedTextField(
                         servidor, { servidor = it.trim() }, label = { Text("Servidor") },
                         singleLine = true, shape = forma, modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)

@@ -39,7 +39,7 @@ jobs:
       - name: Compilar APK de debug
         run: |
           FALHOU=0
-          ./gradlew assembleDebug > gradle.log 2>&1 || FALHOU=1
+          ./gradlew assembleIssafoneDebug assembleIssalinkDebug > gradle.log 2>&1 || FALHOU=1
           # Erros de compilação como anotações (visíveis no resumo da execução)
           grep -E "^e: |error:|What went wrong" -A2 gradle.log | grep -vE "^--$" \
             | awk 'length > 0 && !visto[$0]++' | head -40 \
@@ -64,15 +64,18 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleIssafoneRelease --stacktrace
 
       - name: Juntar APKs
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/IssaFone-debug.apk
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk out/IssaFone.apk
+          cp app/build/outputs/apk/issafone/debug/app-issafone-debug.apk out/IssaFone-debug.apk
+          if [ -f app/build/outputs/apk/issafone/release/app-issafone-release.apk ]; then
+            cp app/build/outputs/apk/issafone/release/app-issafone-release.apk out/IssaFone.apk
           fi
+          # IssaLink (versão genérica): vai numa Release à parte
+          mkdir -p out-issalink
+          cp app/build/outputs/apk/issalink/debug/app-issalink-debug.apk out-issalink/IssaLink.apk
           ls -la out
 
       - name: Publicar APKs
@@ -97,3 +100,20 @@ jobs:
 
             Instala o **IssaFone-debug.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
           files: android/out/*.apk
+
+      # IssaLink: a mesma app sem os dados do Issabel do projeto, para qualquer pessoa usar
+      # na sua central. Release "issalink-N" (não fica como "latest", que é a do IssaFone).
+      - name: Publicar Release do IssaLink
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ format('issalink-{0}', github.run_number) }}
+          name: ${{ format('IssaLink Android (build {0})', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          body: |
+            **IssaLink** — softphone (chamadas SIP, vídeo e chat XMPP) para qualquer central **Issabel 4**.
+
+            1. Prepara o servidor com o script `servidor/configurar-issabel.sh` deste repositório (instruções no README).
+            2. Instala o **IssaLink.apk** no Android e entra com o endereço do servidor, a extensão e a palavra-passe.
+          files: android/out-issalink/IssaLink.apk

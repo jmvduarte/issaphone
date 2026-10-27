@@ -22,7 +22,20 @@
 #  Pode ser corrido várias vezes: o que já estiver feito é mantido/atualizado.
 # =============================================================================
 
-DOMINIO="${DOMINIO:-rsi-a36357.ddns.net}"
+[ "$(id -u)" = 0 ] || { echo "Corre como root."; exit 1; }
+
+# Domínio público do Issabel (tem de apontar para o IP público, com as portas abertas no router).
+# Ordem: variável DOMINIO → o guardado da última vez → o único certificado Let's Encrypt existente → perguntar.
+DOMINIO="${DOMINIO:-$(cat /etc/issafone/dominio 2>/dev/null)}"
+if [ -z "$DOMINIO" ] && [ -d /etc/letsencrypt/live ]; then
+  CERTS=$(find /etc/letsencrypt/live -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null)
+  [ "$(echo "$CERTS" | grep -c .)" = 1 ] && DOMINIO="$CERTS"
+fi
+if [ -z "$DOMINIO" ]; then
+  read -r -p "Domínio público deste Issabel (ex.: pbx.empresa.pt ou nome.ddns.net): " DOMINIO < /dev/tty
+fi
+[ -n "$DOMINIO" ] || { echo "Indica o domínio: DOMINIO=pbx.empresa.pt bash configurar-issabel.sh"; exit 1; }
+mkdir -p /etc/issafone && echo "$DOMINIO" > /etc/issafone/dominio
 EXT_WEB="${EXT_WEB:-200-250}"          # extensões da webapp (intervalo ou lista: 201,202)
 REDE_LOCAL="${REDE_LOCAL:-192.168.0.0/16}"
 EMAIL="${EMAIL:-}"                     # opcional: avisos de expiração do Let's Encrypt
@@ -39,7 +52,6 @@ aviso() { echo "  ${AMARELO}!${FIM} $*"; AVISOS+=("$*"); }
 falha() { echo "  ${VERMELHO}✘${FIM} $*"; FALHAS+=("$*"); }
 copia() { [ -f "$1" ] && [ ! -f "$1.antes-issafone" ] && cp -a "$1" "$1.antes-issafone"; }
 
-[ "$(id -u)" = 0 ] || { echo "Corre como root."; exit 1; }
 
 LE="/etc/letsencrypt/live/$DOMINIO"
 OF_CONF=/opt/openfire/conf/openfire.xml

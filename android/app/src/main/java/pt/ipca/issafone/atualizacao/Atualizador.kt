@@ -29,8 +29,9 @@ import java.net.URL
  */
 object Atualizador {
 
-    private const val NOME_APK = "IssaFone-debug.apk"
-    private val api = "https://api.github.com/repos/${BuildConfig.REPO_ATUALIZACOES}/releases/latest"
+    // Cada app (IssaFone / IssaLink) tem as suas Releases: "android-N" / "issalink-N"
+    private val NOME_APK = BuildConfig.NOME_APK
+    private val api = "https://api.github.com/repos/${BuildConfig.REPO_ATUALIZACOES}/releases?per_page=30"
 
     data class Versao(val codigo: Int, val nome: String, val urlApk: String)
 
@@ -56,7 +57,7 @@ object Atualizador {
                 connectTimeout = 10_000
                 readTimeout = 10_000
                 setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "IssaFone/${BuildConfig.VERSION_NAME}")
+                setRequestProperty("User-Agent", "${BuildConfig.NOME_APP}/${BuildConfig.VERSION_NAME}")
             }
             try {
                 when (con.responseCode) {
@@ -64,8 +65,13 @@ object Atualizador {
                     403, 429 -> return@withContext Resultado.Erro("o GitHub limitou os pedidos; tenta daqui a uns minutos")
                     else -> return@withContext Resultado.Erro("o GitHub respondeu ${con.responseCode}")
                 }
-                val json = JSONObject(con.inputStream.bufferedReader().use { it.readText() })
-                val codigo = json.getString("tag_name").removePrefix("android-").toIntOrNull()
+                val todas = org.json.JSONArray(con.inputStream.bufferedReader().use { it.readText() })
+                // A mais recente desta app (as Releases vêm da mais nova para a mais antiga)
+                val json = (0 until todas.length()).map { todas.getJSONObject(it) }
+                    .filter { !it.optBoolean("draft") && it.getString("tag_name").startsWith(BuildConfig.PREFIXO_RELEASE) }
+                    .maxByOrNull { it.getString("tag_name").removePrefix(BuildConfig.PREFIXO_RELEASE).toIntOrNull() ?: 0 }
+                    ?: return@withContext Resultado.Erro("ainda não há versões publicadas")
+                val codigo = json.getString("tag_name").removePrefix(BuildConfig.PREFIXO_RELEASE).toIntOrNull()
                     ?: return@withContext Resultado.Erro("versão desconhecida (${json.optString("tag_name")})")
                 if (codigo <= BuildConfig.VERSION_CODE) return@withContext Resultado.EmDia
 

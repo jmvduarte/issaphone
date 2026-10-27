@@ -230,7 +230,7 @@ internal fun Cabecalho(
                 Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).border(1.dp, Color.White.copy(alpha = .5f), RoundedCornerShape(11.dp)))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("IssaFone", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                Text(BuildConfig.NOME_APP, color = Color.White, style = MaterialTheme.typography.titleLarge)
                 Text("v${BuildConfig.VERSION_NAME}", color = Color.White.copy(alpha = .7f), fontSize = 11.sp)
             }
             var menu by remember { mutableStateOf(false) }

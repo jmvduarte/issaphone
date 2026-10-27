@@ -48,5 +48,6 @@ object Icones {
     val Tema = Icons.Rounded.DarkMode
     val Sair = Icons.AutoMirrored.Rounded.Logout
     val Cadeado = Icons.Rounded.Lock
+    val Servidor = Icons.Rounded.Dns
     val Aviso = Icons.Rounded.WarningAmber
 }
