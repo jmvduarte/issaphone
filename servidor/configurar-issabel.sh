@@ -23,7 +23,7 @@
 # =============================================================================
 
 DOMINIO="${DOMINIO:-rsi-a36357.ddns.net}"
-EXT_WEB="${EXT_WEB:-201-210}"          # extensões da webapp (intervalo ou lista: 201,202)
+EXT_WEB="${EXT_WEB:-200-250}"          # extensões da webapp (intervalo ou lista: 201,202)
 REDE_LOCAL="${REDE_LOCAL:-192.168.0.0/16}"
 EMAIL="${EMAIL:-}"                     # opcional: avisos de expiração do Let's Encrypt
 REPO="${REPO:-jmvduarte/issaphone}"

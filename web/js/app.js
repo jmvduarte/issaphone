@@ -332,7 +332,7 @@ const Sip = {
     this.ua.on('registrationFailed', (e) => {
       // No registo, "Rejected" é o 403 do Asterisk: palavra-passe errada ou extensão sem WebRTC
       const motivo = e.cause === 'Rejected' || e.cause === 'Authentication Error'
-        ? 'recusado: palavra-passe errada ou extensão não é web (201–210)'
+        ? 'recusado: palavra-passe errada ou extensão não é web (200–250)'
         : `falhou (${MOTIVOS[e.cause] || e.cause})`;
       UI.estado('sip', 'erro', motivo);
     });
