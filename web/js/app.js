@@ -178,7 +178,7 @@ const Toque = {
     this.parar();
     try { this.ctx?.close(); } catch { /* ignora */ }
     this.ctx = null;
-    try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch { /* ignora */ }
+    // (não mexer no navigator.audioSession aqui: no iOS impedia o atender)
   },
   fimChamada() {
     try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch { /* ignora */ }
