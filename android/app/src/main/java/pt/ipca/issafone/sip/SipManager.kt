@@ -93,6 +93,14 @@ class SipManager(context: Context) {
             // Som da chamada no Android: foco de áudio (pára a música) e Bluetooth do carro/auriculares
             // (só da primeira vez e quando a chamada passa a ter/deixa de ter vídeo, para não
             // desfazer o que a pessoa escolheu no botão Alta voz)
+            if (state == Call.State.StreamsRunning && videoAoAtender) {
+                videoAoAtender = false
+                core.createCallParams(call)?.let { p ->
+                    p.isVideoEnabled = true
+                    p.videoDirection = org.linphone.core.MediaDirection.SendRecv
+                    call.update(p)
+                }
+            }
             if (state == Call.State.StreamsRunning) {
                 val video = call.currentParams.isVideoEnabled
                 if (video != videoAplicado) {
@@ -108,6 +116,7 @@ class SipManager(context: Context) {
             if (state == Call.State.End || state == Call.State.Released) {
                 if (core.calls.none { it.state !in terminadas }) {
                     _camaraLigada.value = true; _altaVoz.value = false; rota.terminar(); videoAplicado = null
+                    videoAoAtender = false
                 }
             }
             _chamada.value = calcularUi(if (state == Call.State.Error) "Erro: $message" else null, call)
@@ -260,10 +269,17 @@ class SipManager(context: Context) {
         // Chamada em espera: a que estava a decorrer fica em espera
         core.calls.filter { it != call && it.state == Call.State.StreamsRunning }.forEach { it.pause() }
         val params = core.createCallParams(call) ?: run { call.accept(); return }
-        params.isVideoEnabled = video && call.remoteParams?.isVideoEnabled == true
+        // Atender logo com vídeo não abria a câmara; passar a vídeo depois de atender funciona.
+        // Por isso atende-se só com áudio e, quando a chamada arranca, liga-se o vídeo
+        // (é exatamente o que acontece quando se carrega no botão "Vídeo").
+        params.isVideoEnabled = false
+        videoAoAtender = video && call.remoteParams?.isVideoEnabled == true
         _camaraLigada.value = true
         call.acceptWithParams(params)
     }
+
+    /** Pedido de "atender com vídeo" à espera de a chamada arrancar. */
+    private var videoAoAtender = false
 
     /** Recusa a chamada a tocar, ou desliga a chamada atual (ou a conferência inteira). */
     fun desligar() {
