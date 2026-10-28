@@ -324,6 +324,8 @@ const Sip = {
       uri: `sip:${cfg.extensao}@${cfg.servidor}`,
       password: cfg.passSip,
       register: true,
+      // Registo curto: se o telemóvel fechar a página sem avisar, o Asterisk sabe em 2 min e passa a usar o push
+      register_expires: 120,
       session_timers: false,
       user_agent: 'IssaFone Web',
     });
