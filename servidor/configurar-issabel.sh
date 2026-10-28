@@ -286,10 +286,14 @@ fi
 # ICE da webapp: o Asterisk tem de anunciar também o IP público (candidato STUN),
 # senão o browser só conhece o 192.168.x.x e o som da webapp não chega.
 RTP=/etc/asterisk/rtp.conf
-if [ -f "$RTP" ] && ! grep -q '^stunaddr=' "$RTP"; then
+touch "$RTP"
+if ! grep -q '^stunaddr=' "$RTP"; then
   copia "$RTP"
-  grep -q '^\[general\]' "$RTP" || echo '[general]' >> "$RTP"
-  sed -i '/^\[general\]/a stunaddr=stun.l.google.com:19302' "$RTP"
+  if grep -qE '^\s*\[general\]' "$RTP"; then
+    sed -i -E '0,/^\s*\[general\]/s//&\nstunaddr=stun.l.google.com:19302/' "$RTP"
+  else
+    printf '\n[general]\nstunaddr=stun.l.google.com:19302\n' >> "$RTP"
+  fi
 fi
 asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null
 if grep -q '^stunaddr=' "$RTP" 2>/dev/null; then ok "ICE: o Asterisk anuncia o IP público à webapp (STUN)"
