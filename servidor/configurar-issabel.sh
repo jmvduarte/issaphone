@@ -267,7 +267,9 @@ tlsdontverifyserver=yes
 externhost=__DOMINIO__
 externrefresh=300
 localnet=__REDE__
-localnet=127.0.0.0/255.0.0.0
+; Nota: 127.0.0.1 NÃO pode ser localnet. A webapp entra pelo proxy do Apache
+; (127.0.0.1); se fosse "local", o Asterisk dava-lhe o IP privado no SDP e o som
+; da webapp nunca chegava ao servidor.
 ; <<< IssaFone
 EOF
 sed -i -e "s|__DOMINIO__|$DOMINIO|" -e "s|__REDE__|$REDE_LOCAL|" "$GEN"
@@ -281,6 +283,17 @@ if asterisk -rx "sip show settings" | grep -iE "TLS SIP Bind.*5061|tlsbindaddr.*
 else
   aviso "Não consegui confirmar o SIP sobre TLS (vê: asterisk -rx 'sip show settings' | grep -i tls)"
 fi
+# ICE da webapp: o Asterisk tem de anunciar também o IP público (candidato STUN),
+# senão o browser só conhece o 192.168.x.x e o som da webapp não chega.
+RTP=/etc/asterisk/rtp.conf
+if [ -f "$RTP" ] && ! grep -q '^stunaddr=' "$RTP"; then
+  copia "$RTP"
+  grep -q '^\[general\]' "$RTP" || echo '[general]' >> "$RTP"
+  sed -i '/^\[general\]/a stunaddr=stun.l.google.com:19302' "$RTP"
+fi
+asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null
+if grep -q '^stunaddr=' "$RTP" 2>/dev/null; then ok "ICE: o Asterisk anuncia o IP público à webapp (STUN)"
+else aviso "Não consegui pôr o stunaddr no $RTP (sem ele a webapp pode ficar sem som)"; fi
 if asterisk -rx "sip show settings" | grep -iE "Externhost:\s*$DOMINIO" >/dev/null; then ok "NAT: o Asterisk anuncia o endereço público ($DOMINIO)"
 else aviso "Não consegui confirmar o externhost (vê: asterisk -rx 'sip show settings' | grep -i extern)"; fi
 
