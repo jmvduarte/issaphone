@@ -334,6 +334,12 @@ const Sip = {
     this.ua.on('disconnected', () => UI.estado('sip', 'erro', 'sem ligação ao servidor (portas 443/8089)'));
     this.ua.on('registered', () => {
       UI.estado('sip', 'ok', 'registado');
+      // Sinal de vida a cada 25 s: sem tráfego, proxies e routers fecham o WebSocket parado
+      // e o Asterisk deixa de conseguir enviar as chamadas ("Serious Network Trouble")
+      clearInterval(this.pulso);
+      this.pulso = setInterval(() => {
+        try { if (this.ua?.isConnected()) this.ua.sendOptions(`sip:${cfg.servidor}`, null, { eventHandlers: {} }); } catch { /* ignora */ }
+      }, 25000);
       if (!this.pushFeito) { this.pushFeito = true; Push.ativar(); }
     });
     this.ua.on('unregistered', () => UI.estado('sip', '', 'desligado'));
@@ -521,6 +527,7 @@ const Sip = {
   },
 
   sair() {
+    clearInterval(this.pulso);
     try { this.sessao?.terminate(); } catch { /* ignora */ }
     try { this.ua?.stop(); } catch { /* ignora */ }
     this.ua = null;
@@ -605,6 +612,11 @@ const Xmpp = {
   },
 
   aposLigar() {
+    // Sinal de vida do chat (XEP-0199) a cada 30 s, pela mesma razão do telefone
+    clearInterval(this.pulso);
+    this.pulso = setInterval(() => {
+      if (this.con?.connected) this.con.sendIQ($iq({ type: 'get', to: cfg.dominioXmpp }).c('ping', { xmlns: 'urn:xmpp:ping' }), () => {}, () => {}, 10000);
+    }, 30000);
     this.con.addHandler((m) => this.recebeuMensagem(m), null, 'message');
     this.con.addHandler((p) => this.recebeuPresenca(p), null, 'presence');
     this.con.addHandler((iq) => this.recebeuRoster(iq), NS.ROSTER, 'iq', 'set');
@@ -916,6 +928,7 @@ const Xmpp = {
   },
 
   sair() {
+    clearInterval(this.pulso);
     this.manual = true;
     this.jaLigou = false; this.url = 0; this.tentativas = 0;
     try { this.con?.disconnect(); } catch { /* ignora */ }

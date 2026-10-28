@@ -178,6 +178,9 @@ SSLProxyCheckPeerCN off
 SSLProxyCheckPeerName off
 SSLProxyCheckPeerExpire off
 # timeout alto: a ligação fica aberta e parada entre mensagens
+# (o Apache 2.4.6 do CentOS 7 nem sempre respeita o timeout= do ProxyPass nos WebSockets
+#  e fechava-os ao fim de 60 s parados: o Asterisk ficava sem caminho para enviar chamadas)
+ProxyTimeout 3600
 ProxyPass        /issafone-ws/sip  wss://127.0.0.1:8089/ws  timeout=3600
 ProxyPass        /issafone-ws/xmpp wss://127.0.0.1:7443/ws/ timeout=3600
 # Anexos do chat (plugin HTTP File Upload do Openfire)
