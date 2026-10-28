@@ -315,7 +315,7 @@ novo=$(
   echo "; >>> IssaFone — opções WebRTC e cifra (gerado automaticamente; não editar à mão)"
   for e in $(expandir "$EXT_WEB"); do
     grep -q "^\[$e\]" "$ADD" 2>/dev/null || continue
-    printf '%s\n' "[$e](+)" transport=wss,ws,udp avpf=yes force_avp=yes icesupport=yes encryption=yes \
+    printf '%s\n' "[$e](+)" transport=wss avpf=yes force_avp=yes icesupport=yes encryption=yes \
       dtlsenable=yes dtlsverify=no dtlscertfile=/etc/asterisk/keys/fullchain.pem \
       dtlsprivatekey=/etc/asterisk/keys/privkey.pem dtlssetup=actpass rtcp_mux=yes \
       nat=force_rport,comedia qualify=no disallow=all allow=ulaw,alaw,opus,vp8,h264 ""

@@ -76,7 +76,7 @@ Uma extensão preparada para WebRTC exige áudio cifrado, e por isso deixa de fu
 
 ```ini
 [201](+)
-transport=wss,ws,udp
+transport=wss
 avpf=yes
 force_avp=yes
 icesupport=yes
