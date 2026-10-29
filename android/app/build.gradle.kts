@@ -81,6 +81,17 @@ android {
         }
     }
 
+    // Um APK por tipo de processador (a parte de chamadas, nativa, é a maior) + um universal.
+    // A atualização automática descarrega só o do telemóvel.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

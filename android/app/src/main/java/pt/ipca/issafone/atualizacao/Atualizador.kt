@@ -75,11 +75,15 @@ object Atualizador {
                     ?: return@withContext Resultado.Erro("versão desconhecida (${json.optString("tag_name")})")
                 if (codigo <= BuildConfig.VERSION_CODE) return@withContext Resultado.EmDia
 
-                val assets = json.getJSONArray("assets")
-                val url = (0 until assets.length())
-                    .map { assets.getJSONObject(it) }
-                    .firstOrNull { it.getString("name") == NOME_APK }
-                    ?.getString("browser_download_url")
+                val lista = json.getJSONArray("assets")
+                val assets = (0 until lista.length())
+                    .map { lista.getJSONObject(it) }
+                    .associate { it.getString("name") to it.getString("browser_download_url") }
+                // Primeiro o APK só para o processador deste telemóvel (1/3 do tamanho);
+                // se não houver, o APK universal
+                val base = NOME_APK.removeSuffix(".apk")
+                val url = Build.SUPPORTED_ABIS.firstNotNullOfOrNull { assets["$base-$it.apk"] }
+                    ?: assets[NOME_APK]
                     ?: return@withContext Resultado.Erro("a versão $codigo ainda não tem o APK")
                 Resultado.Nova(Versao(codigo, "1.0.$codigo", url))
             } finally {

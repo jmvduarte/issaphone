@@ -72,14 +72,16 @@ jobs:
         run: |
           mkdir -p out out-issalink
           R=app/build/outputs/apk
-          if [ -f $R/issafone/release/app-issafone-release.apk ]; then
-            # Versão final, assinada com a chave privada
-            cp $R/issafone/release/app-issafone-release.apk out/IssaFone.apk
-            cp $R/issalink/release/app-issalink-release.apk out-issalink/IssaLink.apk
-          else
-            cp $R/issafone/debug/app-issafone-debug.apk out/IssaFone-debug.apk
-            cp $R/issalink/debug/app-issalink-debug.apk out-issalink/IssaLink.apk
-          fi
+          # release (chave privada) se existir; senão debug
+          if [ -f $R/issafone/release/app-issafone-universal-release.apk ]; then T=release; F=IssaFone.apk
+          else T=debug; F=IssaFone-debug.apk; fi
+          # Universal (para instalar à mão) + um por processador (para as atualizações automáticas)
+          cp $R/issafone/$T/app-issafone-universal-$T.apk out/$F
+          cp $R/issalink/$T/app-issalink-universal-$T.apk out-issalink/IssaLink.apk
+          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+            cp $R/issafone/$T/app-issafone-$abi-$T.apk out/${F%.apk}-$abi.apk
+            cp $R/issalink/$T/app-issalink-$abi-$T.apk out-issalink/IssaLink-$abi.apk
+          done
           ls -la out out-issalink
 
       - name: Publicar APKs
@@ -104,7 +106,7 @@ jobs:
 
             1. Prepara o servidor com o script `servidor/configurar-issabel.sh` deste repositório (instruções no README).
             2. Instala o **IssaLink.apk** no Android e entra com o endereço do servidor, a extensão e a palavra-passe.
-          files: android/out-issalink/IssaLink.apk
+          files: android/out-issalink/*.apk
 
       # Cada build do main fica numa Release própria (android-N). O link
       # https://github.com/<utilizador>/<repo>/releases/latest dá sempre o APK mais recente.
