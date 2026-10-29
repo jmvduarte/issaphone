@@ -298,6 +298,32 @@ fi
 asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null
 if grep -q '^stunaddr=' "$RTP" 2>/dev/null; then ok "ICE: o Asterisk anuncia o IP público à webapp (STUN)"
 else aviso "Não consegui pôr o stunaddr no $RTP (sem ele a webapp pode ficar sem som)"; fi
+# O STUN do Asterisk nem sempre dá o endereço público. Garantia: dizer ao Asterisk
+# que o seu IP local (192.168.x.x) é, visto de fora, o IP público do domínio.
+# Sem isto o browser só recebe o 192.168.x.x e a chamada fica muda.
+# O IP público muda (DNS dinâmico), por isso um cron atualiza-o de 5 em 5 minutos.
+cat > /usr/local/sbin/issafone-ip-publico <<'EOS'
+#!/bin/bash
+# IssaFone: mantém o IP público no rtp.conf ([ice_host_candidates]) para a webapp ter som.
+DOMINIO=$(cat /etc/issafone/dominio 2>/dev/null)
+RTP=/etc/asterisk/rtp.conf
+PUB=$(getent ahostsv4 "$DOMINIO" 2>/dev/null | awk 'NR==1{print $1}')
+[[ $PUB =~ ^[0-9]+(\.[0-9]+){3}$ ]] || PUB=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null)
+LAN=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src") print $(i+1)}' | head -1)
+[[ $PUB =~ ^[0-9]+(\.[0-9]+){3}$ && $LAN =~ ^[0-9]+(\.[0-9]+){3}$ ]] || exit 0
+novo=$(printf '%s\n%s\n%s\n%s' "; >>> IssaFone IP publico (gerado pelo issafone-ip-publico; nao editar)" "[ice_host_candidates]" "$LAN => $PUB" "; <<< IssaFone IP publico")
+atual=$(sed -n '/^; >>> IssaFone IP publico/,/^; <<< IssaFone IP publico/p' "$RTP")
+[ "$novo" = "$atual" ] && exit 0
+sed -i '/^; >>> IssaFone IP publico/,/^; <<< IssaFone IP publico/d' "$RTP"
+printf '\n%s\n' "$novo" >> "$RTP"
+asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null 2>&1
+logger -t issafone "IP publico para a webapp: $LAN => $PUB"
+EOS
+chmod +x /usr/local/sbin/issafone-ip-publico
+echo '*/5 * * * * root /usr/local/sbin/issafone-ip-publico' > /etc/cron.d/issafone-ip-publico
+/usr/local/sbin/issafone-ip-publico
+if grep -qE '^[0-9.]+ => [0-9.]+' "$RTP"; then ok "ICE: IP público anunciado à webapp ($(grep -oE '^[0-9.]+ => [0-9.]+' "$RTP"))"
+else aviso "Não consegui pôr o IP público no $RTP (a webapp pode ficar sem som)"; fi
 if asterisk -rx "sip show settings" | grep -iE "Externhost:\s*$DOMINIO" >/dev/null; then ok "NAT: o Asterisk anuncia o endereço público ($DOMINIO)"
 else aviso "Não consegui confirmar o externhost (vê: asterisk -rx 'sip show settings' | grep -i extern)"; fi
 
