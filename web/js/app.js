@@ -1248,7 +1248,7 @@ const UI = {
       else li.append(document.createTextNode(m.texto));
       const t = document.createElement('time');
       t.textContent = (new Date(m.hora).toDateString() === hoje ? fmt : fmtDia).format(m.hora);
-      // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ ciano lida
+      // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ verde lida
       if (m.minha && m.estado != null) {
         const v = document.createElement('span');
         v.className = 'vistos' + (m.estado === LIDA ? ' lida' : '');

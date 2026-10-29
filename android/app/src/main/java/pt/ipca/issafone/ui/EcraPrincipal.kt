@@ -440,7 +440,7 @@ internal fun RecentesUi(
                                 Text(nome, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     color = if (perdida) CorDesligar else MaterialTheme.colorScheme.onSurface)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(icone, null, tint = cor, modifier = Modifier.size(15.dp))
+                                    Icon(icone, null, tint = cor, modifier = Modifier.size(17.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text(
                                         listOfNotNull(
@@ -795,14 +795,14 @@ internal fun ConversaUi(
                         Row(Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(hora.format(Date(m.hora)), color = cor.copy(alpha = .65f), fontSize = 11.sp)
-                            // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ ciano lida
+                            // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ verde lida (azul não se via na bolha azul)
                             if (minha && m.estado != null) Icon(
                                 if (m.estado == Mensagem.ENVIADA) Icones.Enviada else Icones.Entregue,
                                 contentDescription = when (m.estado) {
                                     Mensagem.LIDA -> "Lida"; Mensagem.ENTREGUE -> "Entregue"; else -> "Enviada"
                                 },
-                                tint = if (m.estado == Mensagem.LIDA) Color(0xFF67E8F9) else cor.copy(alpha = .65f),
-                                modifier = Modifier.size(15.dp)
+                                tint = if (m.estado == Mensagem.LIDA) Color(0xFF4ADE80) else cor.copy(alpha = .65f),
+                                modifier = Modifier.size(17.dp)
                             )
                         }
                     }
