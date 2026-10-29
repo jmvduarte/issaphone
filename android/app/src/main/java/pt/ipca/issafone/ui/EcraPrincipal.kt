@@ -656,9 +656,11 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
     val contacto = contactos.firstOrNull { it.jid.equals(jid, ignoreCase = true) }
     val progresso by vm.anexo.collectAsState()
     val ctx = LocalContext.current
+    // Ficheiro escolhido, à espera de confirmação antes de seguir
+    var anexoPorConfirmar by remember { mutableStateOf<android.net.Uri?>(null) }
     val escolherFicheiro = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { vm.enviarAnexo(jid, it) } }
+    ) { uri -> anexoPorConfirmar = uri }
 
     // Conversa aberta e app à frente: avisa o outro de que as mensagens foram lidas
     val ciclo by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
@@ -695,6 +697,12 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
             }
         }
     )
+
+    anexoPorConfirmar?.let { uri ->
+        ConfirmarAnexo(uri, para = vm.xmpp.nomeDe(jid),
+            onEnviar = { anexoPorConfirmar = null; vm.enviarAnexo(jid, uri) },
+            onCancelar = { anexoPorConfirmar = null })
+    }
 
     if (verMembros && grupo != null) DialogoMembros(vm, grupo, onFechar = { verMembros = false }, onSaiu = onVoltar)
     if (confirmarRemover) AlertDialog(
@@ -1280,6 +1288,55 @@ internal fun EscolherDestinoPartilha(
             }
         },
         confirmButton = {},
+        dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } }
+    )
+}
+
+
+/** Antes de enviar um anexo: mostra o ficheiro (pré-visualização se for imagem) e pede confirmação. */
+@Composable
+internal fun ConfirmarAnexo(uri: android.net.Uri, para: String, onEnviar: () -> Unit, onCancelar: () -> Unit) {
+    val ctx = LocalContext.current
+    val (nome, tamanho) = remember(uri) {
+        var n = "ficheiro"; var t = -1L
+        runCatching {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE),
+                null, null, null)?.use { c ->
+                if (c.moveToFirst()) { c.getString(0)?.let { n = it }; if (!c.isNull(1)) t = c.getLong(1) }
+            }
+        }
+        n to t
+    }
+    val imagem = remember(uri) { ctx.contentResolver.getType(uri)?.startsWith("image/") == true }
+    val tamanhoTxt = when {
+        tamanho < 0 -> ""
+        tamanho >= 1_048_576 -> "%.1f MB".format(tamanho / 1_048_576.0)
+        else -> "${(tamanho / 1024).coerceAtLeast(1)} KB"
+    }
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        icon = { Icon(Icones.Anexo, null) },
+        title = { Text("Enviar para $para?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (imagem) coil.compose.AsyncImage(
+                    model = uri, contentDescription = nome,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).clip(RoundedCornerShape(14.dp))
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!imagem) { Icon(Icones.Ficheiro, null); Spacer(Modifier.width(10.dp)) }
+                    Column {
+                        Text(nome, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                        if (tamanhoTxt.isNotEmpty()) Text(tamanhoTxt, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (tamanho > 50L * 1_048_576) Text("O ficheiro tem mais de 50 MB: o servidor pode recusá-lo.",
+                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { Button(onClick = onEnviar) { Icon(Icones.Enviar, null); Spacer(Modifier.width(6.dp)); Text("Enviar") } },
         dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } }
     )
 }
