@@ -218,18 +218,17 @@ class XmppManager(context: Context) {
                 return@withContext
             }
             val jidTexto = if ("@" in destino) destino else "$destino@${con.xmppServiceDomain}"
-            val id = java.util.UUID.randomUUID().toString()
             val msg = con.stanzaFactory.buildMessageStanza()
                 .to(JidCreate.entityBareFrom(jidTexto))
                 .ofType(Message.Type.chat)
-                .setStanzaId(id)
                 .setBody(texto)
                 // Pede "entregue" (XEP-0184) e "lida" (XEP-0333)
                 .addExtension(StandardExtensionElement.builder("request", NS_RECIBOS).build())
                 .addExtension(StandardExtensionElement.builder("markable", NS_MARCADORES).build())
                 .build()
             con.sendStanza(msg)
-            juntar(Mensagem(jidTexto, texto, enviada = true, id = id, estado = Mensagem.ENVIADA))
+            // O Smack dá um id único a cada mensagem: é esse que volta nos vistos
+            juntar(Mensagem(jidTexto, texto, enviada = true, id = msg.stanzaId, estado = Mensagem.ENVIADA))
         } catch (e: Exception) {
             _aviso.value = "Erro ao enviar: ${e.message}"
         }
