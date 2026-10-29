@@ -9,6 +9,8 @@ Este guia serve para quem quer usar o **IssaLink** (app Android), a **webapp** (
 
 Tempo estimado: 45–60 minutos.
 
+> **Só queres chamadas, sem mexer no Issabel?** A app IssaLink funciona como um softphone normal (tipo Zoiper) em qualquer Issabel: instala a app (passo 8), põe o endereço do servidor (domínio ou IP; porta própria como `servidor:porta`), a extensão e a palavra-passe. Sem este guia, as chamadas vão por **UDP sem cifra**, e o chat, a webapp e as notificações do iPhone não ficam disponíveis. Em *Opções avançadas → Ligação das chamadas* podes escolher UDP, TCP ou TLS (a opção *Automática* usa TLS quando o servidor o tiver).
+
 ---
 
 ## 0. O que precisas
