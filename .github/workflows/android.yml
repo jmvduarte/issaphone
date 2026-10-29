@@ -89,22 +89,6 @@ jobs:
           path: android/out/*.apk
           retention-days: 14
 
-      # Cada build do main fica numa Release própria (android-N). O link
-      # https://github.com/<utilizador>/<repo>/releases/latest dá sempre o APK mais recente.
-      - name: Publicar Release com o APK
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('android-{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('IssaFone Android (build {0})', github.run_number) }}
-          target_commitish: ${{ github.sha }}
-          make_latest: true
-          body: |
-            APK do IssaFone gerado automaticamente a partir do commit ${{ github.sha }}.
-
-            Instala o **IssaFone.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
-          files: android/out/*.apk
-
       # IssaLink: a mesma app sem os dados do Issabel do projeto, para qualquer pessoa usar
       # na sua central. Release "issalink-N" (não fica como "latest", que é a do IssaFone).
       - name: Publicar Release do IssaLink
@@ -121,3 +105,19 @@ jobs:
             1. Prepara o servidor com o script `servidor/configurar-issabel.sh` deste repositório (instruções no README).
             2. Instala o **IssaLink.apk** no Android e entra com o endereço do servidor, a extensão e a palavra-passe.
           files: android/out-issalink/IssaLink.apk
+
+      # Cada build do main fica numa Release própria (android-N). O link
+      # https://github.com/<utilizador>/<repo>/releases/latest dá sempre o APK mais recente.
+      - name: Publicar Release com o APK
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('android-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('IssaFone Android (build {0})', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            APK do IssaFone gerado automaticamente a partir do commit ${{ github.sha }}.
+
+            Instala o **IssaFone.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
+          files: android/out/*.apk
