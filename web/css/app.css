@@ -187,6 +187,10 @@ html, body { overflow-x: hidden; }
 #mensagens li { max-width: 78%; padding: 8px 12px; border-radius: 16px; background: var(--bolha-dele); align-self: flex-start; word-wrap: break-word; }
 #mensagens li.minha { background: var(--bolha-minha); color: #fff; align-self: flex-end; }
 #mensagens li time { display: block; font-size: 11px; opacity: .7; margin-top: 2px; }
+#mensagens li.minha time { text-align: right; }
+#mensagens li .vistos { margin-left: 4px; letter-spacing: -3px; font-weight: 700; }
+#mensagens li .vistos.lida { color: #67e8f9; }
+#mensagens li.minha time:has(.lida) { opacity: 1; }
 .escrever { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--linha); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
 
 /* Teclado */

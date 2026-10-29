@@ -13,7 +13,10 @@ import org.jivesoftware.smack.ConnectionConfiguration
 import org.jivesoftware.smack.ReconnectionManager
 import org.jivesoftware.smack.android.AndroidSmackInitializer
 import org.jivesoftware.smack.chat2.ChatManager
+import org.jivesoftware.smack.filter.StanzaTypeFilter
 import org.jivesoftware.smack.packet.Message
+import org.jivesoftware.smack.packet.StandardExtensionElement
+import org.jivesoftware.smackx.receipts.DeliveryReceiptManager
 import org.jivesoftware.smack.packet.Presence
 import org.jivesoftware.smack.roster.Roster
 import org.jivesoftware.smack.roster.RosterListener
@@ -41,8 +44,16 @@ data class Mensagem(
     val enviada: Boolean,
     val hora: Long = System.currentTimeMillis(),
     val autor: String? = null,     // nos grupos: quem escreveu (extensão)
-    val historico: Boolean = false // mensagem antiga reenviada pelo servidor (não notifica)
-)
+    val historico: Boolean = false, // mensagem antiga reenviada pelo servidor (não notifica)
+    val id: String? = null,         // id da mensagem XMPP (para os vistos)
+    val estado: Int? = null         // só nas que eu envio numa conversa individual: ENVIADA/ENTREGUE/LIDA
+) {
+    companion object {
+        const val ENVIADA = 0   // ✓  chegou ao servidor
+        const val ENTREGUE = 1  // ✓✓ chegou ao telemóvel/browser do outro (XEP-0184)
+        const val LIDA = 2      // ✓✓ azul: o outro abriu a conversa (XEP-0333)
+    }
+}
 
 data class Contacto(val jid: String, val nome: String, val online: Boolean)
 
@@ -141,8 +152,13 @@ class XmppManager(context: Context) {
                 // Convites para grupos chegam como mensagens: são tratados pelo MUC
                 if (message.hasExtension(MUCUser.ELEMENT, MUCUser.NAMESPACE)) return@addIncomingListener
                 val corpo = message.body ?: return@addIncomingListener
-                juntar(Mensagem(from.asEntityBareJidString(), corpo, enviada = false))
+                juntar(Mensagem(from.asEntityBareJidString(), corpo, enviada = false, id = message.stanzaId))
             }
+
+            // Vistos: "entregue" é respondido sozinho pelo Smack a quem o pede (XEP-0184);
+            // "entregue"/"lida" que nos chegam atualizam as mensagens que enviámos.
+            DeliveryReceiptManager.getInstanceFor(con).autoReceiptMode = DeliveryReceiptManager.AutoReceiptMode.always
+            con.addAsyncStanzaListener({ st -> (st as? Message)?.let { tratarVisto(it) } }, StanzaTypeFilter.MESSAGE)
 
             val roster = Roster.getInstanceFor(con)
             roster.subscriptionMode = Roster.SubscriptionMode.accept_all
@@ -202,8 +218,18 @@ class XmppManager(context: Context) {
                 return@withContext
             }
             val jidTexto = if ("@" in destino) destino else "$destino@${con.xmppServiceDomain}"
-            ChatManager.getInstanceFor(con).chatWith(JidCreate.entityBareFrom(jidTexto)).send(texto)
-            juntar(Mensagem(jidTexto, texto, enviada = true))
+            val id = java.util.UUID.randomUUID().toString()
+            val msg = con.stanzaFactory.buildMessageStanza()
+                .to(JidCreate.entityBareFrom(jidTexto))
+                .ofType(Message.Type.chat)
+                .setStanzaId(id)
+                .setBody(texto)
+                // Pede "entregue" (XEP-0184) e "lida" (XEP-0333)
+                .addExtension(StandardExtensionElement.builder("request", NS_RECIBOS).build())
+                .addExtension(StandardExtensionElement.builder("markable", NS_MARCADORES).build())
+                .build()
+            con.sendStanza(msg)
+            juntar(Mensagem(jidTexto, texto, enviada = true, id = id, estado = Mensagem.ENVIADA))
         } catch (e: Exception) {
             _aviso.value = "Erro ao enviar: ${e.message}"
         }
@@ -455,6 +481,65 @@ class XmppManager(context: Context) {
         }
     }
 
+    /* ======================= Vistos (entregue / lida) ======================= */
+
+    private val NS_RECIBOS = "urn:xmpp:receipts"
+    private val NS_MARCADORES = "urn:xmpp:chat-markers:0"
+
+    /** Id do último "lida" enviado em cada conversa (para não repetir). */
+    private val lidaEnviada = mutableMapOf<String, String>()
+
+    private fun idDe(ext: org.jivesoftware.smack.packet.ExtensionElement?): String? =
+        ext?.toXML()?.toString()?.let { Regex("""\bid=['"]([^'"]+)['"]""").find(it)?.groupValues?.get(1) }
+
+    @Suppress("DEPRECATION")
+    private fun tratarVisto(m: Message) {
+        val de = m.from?.asBareJid()?.toString() ?: return
+        if (ehGrupo(de)) return
+        idDe(m.getExtension("received", NS_RECIBOS))?.let { marcar(de, it, Mensagem.ENTREGUE) }
+        idDe(m.getExtension("received", NS_MARCADORES))?.let { marcar(de, it, Mensagem.ENTREGUE) }
+        idDe(m.getExtension("displayed", NS_MARCADORES))?.let { marcar(de, it, Mensagem.LIDA) }
+    }
+
+    /**
+     * Atualiza o estado de uma mensagem enviada a [contacto]. "Lida" vale também para
+     * as mensagens anteriores dessa conversa (o outro viu a conversa até ali).
+     */
+    private fun marcar(contacto: String, id: String, estado: Int) {
+        var mudou = false
+        _mensagens.update { lista ->
+            val alvo = lista.firstOrNull { it.enviada && it.id == id && it.contacto.equals(contacto, true) }
+                ?: return@update lista
+            lista.map { m ->
+                val aplica = m.enviada && m.estado != null && m.contacto.equals(contacto, true) &&
+                    (m.id == id || (estado == Mensagem.LIDA && m.hora <= alvo.hora))
+                if (aplica && m.estado!! < estado) { mudou = true; m.copy(estado = estado) } else m
+            }
+        }
+        if (mudou) gravarHistorico()
+    }
+
+    /** Diz ao outro que li a conversa (chamar quando a conversa está aberta no ecrã). */
+    fun marcarLidas(contacto: String) {
+        if (ehGrupo(contacto)) return
+        val con = ligacao ?: return
+        val ultima = _mensagens.value.lastOrNull { !it.enviada && it.contacto.equals(contacto, true) && it.id != null }
+            ?: return
+        if (lidaEnviada[contacto] == ultima.id) return
+        lidaEnviada[contacto] = ultima.id!!
+        scope.launch {
+            runCatching {
+                val msg = con.stanzaFactory.buildMessageStanza()
+                    .to(JidCreate.entityBareFrom(contacto))
+                    .ofType(Message.Type.chat)
+                    .addExtension(StandardExtensionElement.builder("displayed", NS_MARCADORES)
+                        .addAttribute("id", ultima.id).build())
+                    .build()
+                con.sendStanza(msg)
+            }.onFailure { lidaEnviada.remove(contacto) }
+        }
+    }
+
     /* ======================= Histórico no telemóvel ======================= */
 
     /** Lê as conversas guardadas desta conta (cada conta tem o seu ficheiro). */
@@ -468,7 +553,9 @@ class XmppManager(context: Context) {
                 Mensagem(
                     contacto = o.getString("c"), texto = o.getString("t"), enviada = o.getBoolean("e"),
                     hora = o.getLong("h"), autor = o.optString("a").ifEmpty { null },
-                    historico = true // já vistas: não voltam a notificar
+                    historico = true, // já vistas: não voltam a notificar
+                    id = o.optString("i").ifEmpty { null },
+                    estado = if (o.has("s")) o.getInt("s") else null
                 )
             }
         }.getOrDefault(emptyList())
@@ -485,6 +572,8 @@ class XmppManager(context: Context) {
                 arr.put(JSONObject().apply {
                     put("c", m.contacto); put("t", m.texto); put("e", m.enviada); put("h", m.hora)
                     m.autor?.let { put("a", it) }
+                    m.id?.let { put("i", it) }
+                    m.estado?.let { put("s", it) }
                 })
             }
             synchronized(this@XmppManager) {

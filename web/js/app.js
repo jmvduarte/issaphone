@@ -110,17 +110,31 @@ const Historico = {
    * entra na sala: mensagens iguais do mesmo autor com menos de 3 min de diferença
    * são consideradas a mesma e ignoradas. Devolve true se for nova.
    */
-  juntar(jid, texto, minha, autor = null, hora = Date.now()) {
+  juntar(jid, texto, minha, autor = null, hora = Date.now(), extra = {}) {
     const t = this.tudo();
     const lista = t[jid] || [];
     if (autor && lista.some((m) => m.autor === autor && m.texto === texto && Math.abs(m.hora - hora) < 180000)) return false;
-    lista.push({ texto, minha, autor, hora });
+    lista.push({ texto, minha, autor, hora, ...extra });
     lista.sort((a, b) => a.hora - b.hora);
     t[jid] = lista.slice(-300);
     guardar(this.chave(), t);
     return true;
   },
   apagar(jid) { const t = this.tudo(); delete t[jid]; guardar(this.chave(), t); },
+  /** Vistos: muda o estado de uma mensagem minha; "lida" vale também para as anteriores. */
+  marcar(jid, id, estado) {
+    const t = this.tudo();
+    const lista = t[jid] || [];
+    const alvo = lista.find((m) => m.minha && m.id === id);
+    if (!alvo) return false;
+    let mudou = false;
+    for (const m of lista) {
+      if (!m.minha || m.estado == null || m.estado >= estado) continue;
+      if (m.id === id || (estado === LIDA && m.hora <= alvo.hora)) { m.estado = estado; mudou = true; }
+    }
+    if (mudou) guardar(this.chave(), t);
+    return mudou;
+  },
 };
 
 /* ======================= Registo de chamadas ======================= */
@@ -551,7 +565,12 @@ const NS = {
   DADOS: 'jabber:x:data',
   PRIVADO: 'jabber:iq:private',
   MARCADORES: 'storage:bookmarks',
+  RECIBOS: 'urn:xmpp:receipts',          // XEP-0184: "entregue"
+  MARCAS: 'urn:xmpp:chat-markers:0',     // XEP-0333: "lida"
 };
+
+/** Estado das mensagens que envio numa conversa individual (vistos). */
+const ENVIADA = 0, ENTREGUE = 1, LIDA = 2;
 
 const Xmpp = {
   con: null, contactos: new Map(), grupos: new Map(), manual: false, tentativas: 0, url: 0, jaLigou: false,
@@ -680,6 +699,17 @@ const Xmpp = {
       return true;
     }
 
+    // Vistos que nos chegam: "entregue" (XEP-0184 ou XEP-0333) e "lida" (XEP-0333)
+    if (!this.ehGrupo(de)) {
+      const idDe = (ns, nome) => m.getElementsByTagNameNS(ns, nome)[0]?.getAttribute('id');
+      let mudou = false;
+      const entregue = idDe(NS.RECIBOS, 'received') || idDe(NS.MARCAS, 'received');
+      const lida = idDe(NS.MARCAS, 'displayed');
+      if (entregue) mudou = Historico.marcar(de, entregue, ENTREGUE) || mudou;
+      if (lida) mudou = Historico.marcar(de, lida, LIDA) || mudou;
+      if (mudou && de === UI.conversaCom) UI.mensagens();
+    }
+
     const corpo = m.getElementsByTagName('body')[0];
     if (!corpo) return true;
     const texto = corpo.textContent;
@@ -693,7 +723,12 @@ const Xmpp = {
       return true;
     }
     if (!['chat', 'normal'].includes(tipo)) return true;
-    Historico.juntar(de, texto, false);
+    const id = m.getAttribute('id');
+    // Quem envia pediu confirmação de entrega: responde já
+    if (id && m.getElementsByTagNameNS(NS.RECIBOS, 'request')[0]) {
+      this.con.send($msg({ to: m.getAttribute('from'), id: this.con.getUniqueId('r') }).c('received', { xmlns: NS.RECIBOS, id }));
+    }
+    Historico.juntar(de, texto, false, null, Date.now(), id ? { id } : {});
     if (!this.contactos.has(de)) this.contactos.set(de, { jid: de, nome: de.split('@')[0], online: true });
     UI.novaMensagem(de, texto);
     return true;
@@ -706,9 +741,22 @@ const Xmpp = {
       this.con.send($msg({ to: para, type: 'groupchat' }).c('body').t(texto));
       return true;
     }
-    this.con.send($msg({ to: para, type: 'chat' }).c('body').t(texto));
-    Historico.juntar(para, texto, true);
+    const id = this.con.getUniqueId('m');
+    this.con.send($msg({ to: para, type: 'chat', id }).c('body').t(texto).up()
+      .c('request', { xmlns: NS.RECIBOS }).up()
+      .c('markable', { xmlns: NS.MARCAS }));
+    Historico.juntar(para, texto, true, null, Date.now(), { id, estado: ENVIADA });
     return true;
+  },
+
+  /** Diz ao outro que li a conversa até à última mensagem dele (XEP-0333). */
+  lidaEnviada: {},
+  marcarLida(jid) {
+    if (!jid || this.ehGrupo(jid) || !this.con?.connected) return;
+    const ultima = Historico.de(jid).filter((m) => !m.minha && m.id).at(-1);
+    if (!ultima || this.lidaEnviada[jid] === ultima.id) return;
+    this.lidaEnviada[jid] = ultima.id;
+    this.con.send($msg({ to: jid, type: 'chat' }).c('displayed', { xmlns: NS.MARCAS, id: ultima.id }));
   },
 
   /**
@@ -1168,6 +1216,7 @@ const UI = {
     this.mensagens();
     this.contactos();
     this.vista('conversa');
+    Xmpp.marcarLida(jid);
     if (matchMedia('(min-width: 900px)').matches) $('#form-mensagem input').focus();
   },
 
@@ -1199,6 +1248,14 @@ const UI = {
       else li.append(document.createTextNode(m.texto));
       const t = document.createElement('time');
       t.textContent = (new Date(m.hora).toDateString() === hoje ? fmt : fmtDia).format(m.hora);
+      // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ ciano lida
+      if (m.minha && m.estado != null) {
+        const v = document.createElement('span');
+        v.className = 'vistos' + (m.estado === LIDA ? ' lida' : '');
+        v.textContent = m.estado === ENVIADA ? '✓' : '✓✓';
+        v.title = ['Enviada', 'Entregue', 'Lida'][m.estado];
+        t.append(v);
+      }
       li.append(t);
       return li;
     }));
@@ -1209,6 +1266,7 @@ const UI = {
     const largo = matchMedia('(min-width: 900px)').matches;
     const aVer = de === this.conversaCom && !document.hidden && (largo || $('.corpo').dataset.vista === 'conversa');
     if (de === this.conversaCom) this.mensagens();
+    if (aVer) Xmpp.marcarLida(de);
     if (!aVer && !semAviso) this.porLer.set(de, (this.porLer.get(de) || 0) + 1);
     this.contactos();
     if (!semAviso) {
@@ -1519,6 +1577,7 @@ function ligarEventos() {
     if (!document.hidden && UI.conversaCom && $('.corpo').dataset.vista !== 'teclado') {
       UI.porLer.delete(UI.conversaCom);
       UI.contactos();
+      Xmpp.marcarLida(UI.conversaCom);
     }
   });
 

@@ -44,9 +44,9 @@ class CapturasTest {
     private val grupos = listOf(Grupo("suporte@conference.issa", "Suporte", true, listOf("102", "105")))
     private val mensagens = listOf(
         Mensagem("102@issa", "Olá Jorge! Já tens o relatório da reunião?", false, agora - 3_600_000),
-        Mensagem("102@issa", "Sim, envio-te daqui a 5 minutos 👍", true, agora - 3_500_000),
+        Mensagem("102@issa", "Sim, envio-te daqui a 5 minutos 👍", true, agora - 3_500_000, estado = Mensagem.LIDA),
         Mensagem("102@issa", "Perfeito, obrigada.", false, agora - 3_400_000),
-        Mensagem("102@issa", "Já está no teu email. Liga-me se precisares de alguma coisa.", true, agora - 600_000),
+        Mensagem("102@issa", "Já está no teu email. Liga-me se precisares de alguma coisa.", true, agora - 600_000, estado = Mensagem.ENTREGUE),
         Mensagem("102@issa", "https://rsi-a36357.ddns.net/httpfileupload/abc123/Relatorio_outubro.pdf", false, agora - 300_000),
     )
     private val ultima = { jid: String ->

@@ -46,6 +46,7 @@ import pt.ipca.issafone.xmpp.Membro
 import pt.ipca.issafone.xmpp.Mensagem
 import java.text.Normalizer
 import java.text.SimpleDateFormat
+import androidx.lifecycle.compose.currentStateAsState
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -647,6 +648,12 @@ private fun Conversa(vm: AppViewModel, jid: String, onVoltar: () -> Unit, onLiga
         androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri -> uri?.let { vm.enviarAnexo(jid, it) } }
 
+    // Conversa aberta e app à frente: avisa o outro de que as mensagens foram lidas
+    val ciclo by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    LaunchedEffect(msgs.lastOrNull()?.id, ciclo) {
+        if (!ehGrupo && ciclo.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) vm.xmpp.marcarLidas(jid)
+    }
+
     // O grupo deixou de existir (saímos, fomos removidos ou foi apagado)
     LaunchedEffect(ehGrupo, grupo) { if (ehGrupo && grupo == null && grupos.isNotEmpty()) onVoltar() }
 
@@ -785,8 +792,19 @@ internal fun ConversaUi(
                         val anexo = pt.ipca.issafone.xmpp.anexoDe(m.texto)
                         if (anexo == null) Text(m.texto, color = cor, style = MaterialTheme.typography.bodyLarge)
                         else BolhaAnexo(anexo, minha, onAbrirAnexo)
-                        Text(hora.format(Date(m.hora)), color = cor.copy(alpha = .65f), fontSize = 11.sp,
-                            modifier = Modifier.align(Alignment.End))
+                        Row(Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(hora.format(Date(m.hora)), color = cor.copy(alpha = .65f), fontSize = 11.sp)
+                            // Vistos: ✓ enviada · ✓✓ entregue · ✓✓ ciano lida
+                            if (minha && m.estado != null) Icon(
+                                if (m.estado == Mensagem.ENVIADA) Icones.Enviada else Icones.Entregue,
+                                contentDescription = when (m.estado) {
+                                    Mensagem.LIDA -> "Lida"; Mensagem.ENTREGUE -> "Entregue"; else -> "Enviada"
+                                },
+                                tint = if (m.estado == Mensagem.LIDA) Color(0xFF67E8F9) else cor.copy(alpha = .65f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                     }
                 }
             }

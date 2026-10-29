@@ -42,6 +42,8 @@ object Icones {
     val Anexo = Icons.Rounded.AttachFile
     val Ficheiro = Icons.Rounded.Description
     val Imagem = Icons.Rounded.Image
+    val Enviada = Icons.Rounded.Done
+    val Entregue = Icons.Rounded.DoneAll
 
     // Menu
     val Atualizar = Icons.Rounded.SystemUpdate
