@@ -433,7 +433,7 @@ for e in $(expandir "$EXT_WEB"); do
   else
     # O "sip reload" demora um pouco: tenta durante alguns segundos antes de dar erro
     pronto=0
-    for i in 1 2 3 4 5 6; do
+    for i in $(seq 1 15); do
       asterisk -rx "sip show peer $e" | grep -qiE "Allowed.Tr[a-z]*p.*WSS" && { pronto=1; break; }
       sleep 2
     done
@@ -657,7 +657,13 @@ EOF2
   } >> "$EXTC"
   chown asterisk:asterisk "$EXTC"
   asterisk -rx "dialplan reload" >/dev/null
-  if asterisk -rx "dialplan show issafone-push" | grep -q DEVICE_STATE; then ok "Plano de marcação: push + espera nas extensões $EXT_WEB"
+  # O reload é assíncrono: tenta durante uns segundos antes de dar erro
+  pronto=0
+  for i in $(seq 1 10); do
+    asterisk -rx "dialplan show issafone-push" 2>/dev/null | grep -q DEVICE_STATE && { pronto=1; break; }
+    sleep 1
+  done
+  if [ $pronto = 1 ]; then ok "Plano de marcação: push + espera nas extensões $EXT_WEB"
   else falha "O plano de marcação do push não ficou carregado"; fi
   systemctl reload httpd 2>/dev/null
 fi
