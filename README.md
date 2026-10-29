@@ -53,7 +53,7 @@ git commit -m "IssaFone: versões Android e iOS"
 ## Obter as apps
 
 **Android**
-- Em *Actions → Android build →* última execução, descarrega o artefacto **IssaFone-apk** e instala o `IssaFone-debug.apk` no telemóvel. É preciso autorizar "instalar apps de origem desconhecida".
+- Em *Actions → Android build →* última execução, descarrega o artefacto **IssaFone-apk** e instala o `IssaFone.apk` no telemóvel. É preciso autorizar "instalar apps de origem desconhecida".
 - Para uma versão "oficial" com link fixo, cria uma tag e o APK fica publicado em *Releases*:
   ```bash
   git tag v1.0 && git push origin v1.0

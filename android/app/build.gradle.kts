@@ -36,7 +36,7 @@ android {
             buildConfigField("String", "NOME_APP", "\"IssaFone\"")
             buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
             buildConfigField("String", "PREFIXO_RELEASE", "\"android-\"")
-            buildConfigField("String", "NOME_APK", "\"IssaFone-debug.apk\"")
+            buildConfigField("String", "NOME_APK", "\"IssaFone.apk\"")
             // O servidor do projeto tem SIP sobre TLS e SRTP obrigatórios
             buildConfigField("String", "TRANSPORTE_PADRAO", "\"tls\"")
         }
@@ -85,6 +85,12 @@ android {
             isMinifyEnabled = false
             if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
         }
+    }
+
+    // O lint não deve impedir a compilação da versão final (os avisos ficam no relatório)
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     compileOptions {

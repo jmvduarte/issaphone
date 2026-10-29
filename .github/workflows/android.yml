@@ -1,6 +1,8 @@
 # Compila o IssaFone para Android e gera os .apk.
-#  - Sempre: APK de debug (instala-se diretamente no telemóvel).
-#  - Se existirem os Secrets da keystore: APK de release assinado.
+#  - Com os Secrets da keystore (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#    ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD): APKs de release assinados com a chave
+#    privada → IssaFone.apk e IssaLink.apk (o Play Protect desconfia menos destes).
+#  - Sem eles: APKs de debug (chave de teste pública), como antes.
 #  - Cada build do main (e cada tag vX.Y) publica o APK numa Release do GitHub.
 
 name: Android build
@@ -64,19 +66,21 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleIssafoneRelease --stacktrace
+        run: ./gradlew assembleIssafoneRelease assembleIssalinkRelease --stacktrace
 
       - name: Juntar APKs
         run: |
-          mkdir -p out
-          cp app/build/outputs/apk/issafone/debug/app-issafone-debug.apk out/IssaFone-debug.apk
-          if [ -f app/build/outputs/apk/issafone/release/app-issafone-release.apk ]; then
-            cp app/build/outputs/apk/issafone/release/app-issafone-release.apk out/IssaFone.apk
+          mkdir -p out out-issalink
+          R=app/build/outputs/apk
+          if [ -f $R/issafone/release/app-issafone-release.apk ]; then
+            # Versão final, assinada com a chave privada
+            cp $R/issafone/release/app-issafone-release.apk out/IssaFone.apk
+            cp $R/issalink/release/app-issalink-release.apk out-issalink/IssaLink.apk
+          else
+            cp $R/issafone/debug/app-issafone-debug.apk out/IssaFone-debug.apk
+            cp $R/issalink/debug/app-issalink-debug.apk out-issalink/IssaLink.apk
           fi
-          # IssaLink (versão genérica): vai numa Release à parte
-          mkdir -p out-issalink
-          cp app/build/outputs/apk/issalink/debug/app-issalink-debug.apk out-issalink/IssaLink.apk
-          ls -la out
+          ls -la out out-issalink
 
       - name: Publicar APKs
         uses: actions/upload-artifact@v4
@@ -98,7 +102,7 @@ jobs:
           body: |
             APK do IssaFone gerado automaticamente a partir do commit ${{ github.sha }}.
 
-            Instala o **IssaFone-debug.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
+            Instala o **IssaFone.apk** no telemóvel (autoriza "instalar apps de origem desconhecida").
           files: android/out/*.apk
 
       # IssaLink: a mesma app sem os dados do Issabel do projeto, para qualquer pessoa usar
