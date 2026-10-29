@@ -27,8 +27,6 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
-      # O Paparazzi desenha com a plataforma Android 34 (a app compila com a 36)
-      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" > /dev/null
 
       - name: Gerar capturas
         run: |

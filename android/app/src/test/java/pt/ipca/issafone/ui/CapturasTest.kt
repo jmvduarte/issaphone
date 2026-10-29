@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
-import app.cash.paparazzi.detectEnvironment
 import org.junit.Rule
 import org.junit.Test
 import pt.ipca.issafone.Config
@@ -29,10 +28,6 @@ class CapturasTest {
         deviceConfig = DeviceConfig.PIXEL_6,
         theme = "android:Theme.Material.Light.NoActionBar",
         maxPercentDifference = 100.0,
-        // O Paparazzi 1.3 só sabe desenhar com a plataforma 34; a app compila com a 36
-        environment = detectEnvironment().run {
-            copy(compileSdkVersion = 34)
-        },
     )
 
     private val agora = 1_793_100_000_000L   // hora fixa, para as capturas não mudarem
