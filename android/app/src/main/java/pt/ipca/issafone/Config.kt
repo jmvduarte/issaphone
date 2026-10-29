@@ -9,7 +9,9 @@ data class Config(
     val passwordSip: String = "",    // "secret" da extensão
     val dominioXmpp: String = "",    // XMPP Domain do Openfire
     val passwordXmpp: String = "",   // password do utilizador no Openfire
-    val usarTls: Boolean = true
+    val usarTls: Boolean = true,
+    // Ligação das chamadas: "auto" (TLS se o servidor tiver, senão UDP), "tls", "tcp" ou "udp"
+    val transporte: String = BuildConfig.TRANSPORTE_PADRAO
 ) {
     val valida get() = servidor.isNotBlank() && utilizador.isNotBlank() && passwordSip.isNotBlank()
 }
@@ -29,7 +31,8 @@ object ConfigStore {
             dominioXmpp = getString("dominioXmpp", "") ?: "",
             passwordXmpp = getString("passwordXmpp", "") ?: "",
             // O Openfire tem certificado Let's Encrypt: o chat vai cifrado por omissão
-            usarTls = getBoolean("usarTls", true)
+            usarTls = getBoolean("usarTls", true),
+            transporte = getString("transporte", null) ?: BuildConfig.TRANSPORTE_PADRAO
         )
     }
 
@@ -41,6 +44,7 @@ object ConfigStore {
             .putString("dominioXmpp", c.dominioXmpp)
             .putString("passwordXmpp", c.passwordXmpp)
             .putBoolean("usarTls", c.usarTls)
+            .putString("transporte", c.transporte)
             .apply()
     }
 

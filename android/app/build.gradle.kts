@@ -37,6 +37,8 @@ android {
             buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
             buildConfigField("String", "PREFIXO_RELEASE", "\"android-\"")
             buildConfigField("String", "NOME_APK", "\"IssaFone-debug.apk\"")
+            // O servidor do projeto tem SIP sobre TLS e SRTP obrigatórios
+            buildConfigField("String", "TRANSPORTE_PADRAO", "\"tls\"")
         }
         create("issalink") {
             dimension = "marca"
@@ -46,6 +48,8 @@ android {
             buildConfigField("String", "SERVIDOR_PADRAO", "\"\"")
             buildConfigField("String", "PREFIXO_RELEASE", "\"issalink-\"")
             buildConfigField("String", "NOME_APK", "\"IssaLink.apk\"")
+            // Qualquer Issabel: usa TLS se o servidor o tiver; senão UDP normal, como o Zoiper
+            buildConfigField("String", "TRANSPORTE_PADRAO", "\"auto\"")
         }
     }
 

@@ -64,7 +64,7 @@ class SipManager(context: Context) {
             core: Core, account: Account, state: RegistrationState, message: String
         ) {
             _registo.value = when (state) {
-                RegistrationState.Ok -> "Registado"
+                RegistrationState.Ok -> if (ligacao.cifrada) "Registado" else "Registado · sem cifra"
                 RegistrationState.Progress -> "A registar…"
                 RegistrationState.Failed -> "Falhou: $message"
                 RegistrationState.Cleared -> "Desligado"
@@ -83,6 +83,11 @@ class SipManager(context: Context) {
         }
 
         override fun onCallStateChanged(core: Core, call: Call, state: Call.State, message: String) {
+            // Já em chamada: quem liga ouve "ocupado" (não há chamada em espera)
+            if (state == Call.State.IncomingReceived && core.calls.any { it != call && it.state !in terminadas }) {
+                call.decline(Reason.Busy)
+                return
+            }
             val remoto = call.remoteAddress.username ?: call.remoteAddress.asStringUriOnly()
             val video = call.currentParams.isVideoEnabled
             if (video || call.remoteParams?.isVideoEnabled == true && state == Call.State.IncomingReceived ||
@@ -198,9 +203,7 @@ class SipManager(context: Context) {
         core.videoPayloadTypes.forEach { it.enable(it.mimeType.uppercase() in setOf("VP8", "H264")) }
         usarCamaraFrontal()
 
-        // Cifra: áudio e vídeo SRTP obrigatórios (o servidor também os exige)
-        core.mediaEncryption = MediaEncryption.SRTP
-        core.isMediaEncryptionMandatory = true
+        // Cifra do som: definida em ligar() conforme a ligação (TLS → SRTP obrigatório)
         // Só as cifras que o Asterisk 16 (libsrtp 1.5) suporta. A Linphone oferecia primeiro
         // AEAD_AES_128_GCM, que o Asterisk recusa ("Unsupported crypto suite").
         core.config.setString("sip", "srtp_crypto_suites", "AES_CM_128_HMAC_SHA1_80, AES_CM_128_HMAC_SHA1_32")
@@ -225,20 +228,55 @@ class SipManager(context: Context) {
     /** Força novo registo (ex.: depois de o telemóvel mudar de rede). */
     fun refrescarRegisto() = core.refreshRegisters()
 
-    fun ligar(utilizador: String, password: String, servidor: String, porta: Int = 5061) {
+    /** Como o telemóvel fala com o Issabel. */
+    enum class Ligacao(val tipo: TransportType, val porta: Int, val cifrada: Boolean) {
+        TLS(TransportType.Tls, 5061, true),   // sinalização TLS + som SRTP (servidor preparado pelo script)
+        TCP(TransportType.Tcp, 5060, false),
+        UDP(TransportType.Udp, 5060, false);  // como o Zoiper num Issabel sem alterações
+
+        companion object {
+            /** "auto": TLS se o servidor aceitar ligações na 5061, senão UDP. */
+            suspend fun escolher(preferencia: String, host: String): Ligacao = when (preferencia.lowercase()) {
+                "tls" -> TLS
+                "tcp" -> TCP
+                "udp" -> UDP
+                // Com o IP em vez do domínio o certificado TLS não confere: vai por UDP
+                else -> if (Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(host)) UDP
+                else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        java.net.Socket().use { it.connect(java.net.InetSocketAddress(host, 5061), 3000) }
+                        TLS
+                    }.getOrDefault(UDP)
+                }
+            }
+        }
+    }
+
+    /** Ligação em uso (para o estado no ecrã). */
+    var ligacao: Ligacao = Ligacao.TLS
+        private set
+
+    fun ligar(utilizador: String, password: String, servidor: String, ligacao: Ligacao = Ligacao.TLS, porta: Int? = null) {
+        this.ligacao = ligacao
         dominio = servidor
         registoChamadas.usarConta("$utilizador@$servidor")
         // Limpa contas anteriores
         core.clearAccounts()
         core.clearAllAuthInfo()
 
+        // TLS: som SRTP obrigatório (o servidor também o exige). UDP/TCP: sem cifra, como um
+        // softphone normal num Issabel sem alterações (o Asterisk recusaria SRTP obrigatório).
+        core.mediaEncryption = if (ligacao.cifrada) MediaEncryption.SRTP else MediaEncryption.None
+        core.isMediaEncryptionMandatory = ligacao.cifrada
+
         val auth = factory.createAuthInfo(utilizador, null, password, null, null, servidor, null)
         val params = core.createAccountParams()
         params.identityAddress = factory.createAddress("sip:$utilizador@$servidor")
-        val servidorAddr = factory.createAddress("sip:$servidor:$porta")
-        // SIP sobre TLS (porta 5061): o registo e as chamadas vão cifrados
-        servidorAddr?.transport = TransportType.Tls
+        val servidorAddr = factory.createAddress("sip:$servidor:${porta ?: ligacao.porta}")
+        servidorAddr?.transport = ligacao.tipo
         params.serverAddress = servidorAddr
+        // As chamadas seguem pelo mesmo caminho do registo (porta e transporte escolhidos)
+        params.isOutboundProxyEnabled = true
         params.isRegisterEnabled = true
         // Registo curto: o Asterisk fica a saber depressa se o telemóvel saiu da rede
         params.expires = 120

@@ -252,6 +252,8 @@ sed -i '/^; >>> IssaFone/,/^; <<< IssaFone/d' "$GEN"
 cat >> "$GEN" <<'EOF'
 ; >>> IssaFone — videochamadas e SIP cifrado (gerado pelo configurar-issabel.sh)
 videosupport=yes
+; Contar chamadas por extensão: o Issabel sabe quando uma extensão está ocupada
+callcounter=yes
 allow=vp8
 allow=h264
 ; SIP sobre TLS (porta 5061) para as apps, com o certificado Let's Encrypt
@@ -371,6 +373,9 @@ novo=$(
   done
   echo "; <<< IssaFone"
 )
+# Sem chamada em espera: quem liga para uma extensão já em chamada ouve "ocupado".
+# (O Issabel ativa a chamada em espera em cada extensão nova; isto desfaz-o.)
+asterisk -rx "database deltree CW" >/dev/null 2>&1
 atual=$(sed -n '/^; >>> IssaFone/,/^; <<< IssaFone/p' "$POST" 2>/dev/null)
 if [ "$novo" != "$atual" ]; then
   touch "$POST"

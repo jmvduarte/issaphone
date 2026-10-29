@@ -209,7 +209,7 @@ internal fun Cabecalho(
     onSair: () -> Unit,
 ) {
     val telOk = when {
-        registo.equals("Registado", ignoreCase = true) -> true
+        registo.startsWith("Registado", ignoreCase = true) -> true
         registo.startsWith("A registar") -> null
         else -> false
     }

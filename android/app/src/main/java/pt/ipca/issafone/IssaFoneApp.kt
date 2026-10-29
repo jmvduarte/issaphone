@@ -35,13 +35,19 @@ class IssaFoneApp : Application() {
     fun ligar(c: Config, forcar: Boolean = false) {
         if (!forcar && configLigada == c) return
         configLigada = c
-        sip.ligar(c.utilizador, c.passwordSip, c.servidor)
+        // "pbx.empresa.pt:5070" → servidor + porta SIP própria (como no Zoiper)
+        val host = c.servidor.substringBefore(':')
+        val porta = c.servidor.substringAfter(':', "").toIntOrNull()
+        scope.launch {
+            val ligacao = SipManager.Ligacao.escolher(c.transporte, host)
+            sip.ligar(c.utilizador, c.passwordSip, host, ligacao, porta)
+        }
         scope.launch {
             xmpp.ligar(
                 utilizador = c.utilizador,
                 password = c.passwordXmpp.ifBlank { c.passwordSip },
-                dominio = c.dominioXmpp.ifBlank { c.servidor },
-                host = c.servidor,
+                dominio = c.dominioXmpp.ifBlank { host },
+                host = host,
                 usarTls = c.usarTls
             )
         }

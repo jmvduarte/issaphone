@@ -33,6 +33,7 @@ fun EcraLogin(vm: AppViewModel) {
     EcraLoginUi(atual) { vm.entrar(it) }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
     var utilizador by remember { mutableStateOf(atual.utilizador) }
@@ -45,9 +46,10 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
     var dominio by remember { mutableStateOf(atual.dominioXmpp) }
     var passXmpp by remember { mutableStateOf(atual.passwordXmpp) }
     var tls by remember { mutableStateOf(atual.usarTls) }
+    var transporte by remember { mutableStateOf(atual.transporte) }
 
     val podeEntrar = servidor.isNotBlank() && utilizador.isNotBlank() && passSip.isNotBlank()
-    val entrar = { if (podeEntrar) onEntrar(Config(servidor, utilizador, passSip, dominio, passXmpp, tls)) }
+    val entrar = { if (podeEntrar) onEntrar(Config(servidor, utilizador, passSip, dominio, passXmpp, tls, transporte)) }
     val forma = RoundedCornerShape(16.dp)
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -90,7 +92,7 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 // Versão genérica (IssaLink): o servidor é pedido logo aqui
                 if (generica) OutlinedTextField(
-                    servidor, { servidor = it.trim() }, label = { Text("Servidor (ex.: pbx.empresa.pt)") },
+                    servidor, { servidor = it.trim() }, label = { Text("Servidor (ex.: pbx.empresa.pt ou 192.168.1.10)") },
                     leadingIcon = { Icon(Icones.Servidor, null) },
                     singleLine = true, shape = forma, modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next)
@@ -136,6 +138,20 @@ internal fun EcraLoginUi(atual: Config, onEntrar: (Config) -> Unit) {
                         passXmpp, { passXmpp = it }, label = { Text("Palavra-passe do chat (vazio = a mesma)") },
                         singleLine = true, visualTransformation = PasswordVisualTransformation(), shape = forma,
                         modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Ligação das chamadas", style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("auto" to "Automática", "tls" to "TLS", "tcp" to "TCP", "udp" to "UDP").forEach { (v, nome) ->
+                            FilterChip(selected = transporte == v, onClick = { transporte = v }, label = { Text(nome) })
+                        }
+                    }
+                    Text(
+                        when (transporte) {
+                            "tls" -> "Chamadas cifradas (TLS na porta 5061 e som SRTP). O servidor tem de estar preparado."
+                            "auto" -> "Usa TLS se o servidor tiver a porta 5061; senão, UDP normal (como o Zoiper)."
+                            else -> "Sem cifra, como um softphone normal. Funciona em qualquer Issabel. Porta própria: servidor:porta."
+                        },
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Text("Chat cifrado (TLS)", modifier = Modifier.weight(1f))
