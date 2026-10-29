@@ -88,6 +88,17 @@ fun EcraPrincipal(vm: AppViewModel) {
     }
     LaunchedEffect(aviso) { aviso?.let { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show(); vm.xmpp.limparAviso() } }
 
+    // Algo partilhado a partir de outra app: escolher para quem vai
+    val partilha by vm.partilha.collectAsState()
+    partilha?.let { p ->
+        EscolherDestinoPartilha(
+            descricao = p.descricao,
+            grupos = grupos, contactos = contactos,
+            onEscolher = { jid -> vm.enviarPartilha(jid) },
+            onCancelar = { vm.receberPartilha(null) }
+        )
+    }
+
     val ligar = { num: String, video: Boolean -> vm.sip.chamar(num, video) }
     val ultima = { jid: String ->
         mensagens.lastOrNull { it.contacto.equals(jid, ignoreCase = true) }?.let {
@@ -1223,5 +1234,52 @@ private fun EscolherExtensao(
             }
         },
         dismissButton = { TextButton(onClick = aoFechar) { Text("Cancelar") } }
+    )
+}
+
+
+/** "Partilhar com…": lista de grupos e contactos para enviar o que veio de outra app. */
+@Composable
+internal fun EscolherDestinoPartilha(
+    descricao: String,
+    grupos: List<Grupo>,
+    contactos: List<Contacto>,
+    onEscolher: (String) -> Unit,
+    onCancelar: () -> Unit,
+) {
+    var filtro by remember { mutableStateOf("") }
+    val itens = (grupos.map { Triple(it.jid, it.nome, true) } + contactos.map { Triple(it.jid, it.nome, false) })
+        .filter { filtro.isBlank() || it.second.contains(filtro, ignoreCase = true) || it.first.contains(filtro, ignoreCase = true) }
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text("Enviar $descricao para…") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(filtro, { filtro = it }, singleLine = true, placeholder = { Text("Procurar") },
+                    leadingIcon = { Icon(Icones.Pesquisar, null) }, modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp))
+                if (itens.isEmpty()) Text("Sem contactos (o chat está ligado?)",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(itens) { (jid, nome, grupo) ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onEscolher(jid) }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Avatar(nome, tamanho = 38.dp, grupo = grupo)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(nome, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                                Text(if (grupo) "Grupo" else "Ext. ${jid.substringBefore("@")}",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onCancelar) { Text("Cancelar") } }
     )
 }

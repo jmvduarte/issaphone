@@ -76,7 +76,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val anexo: StateFlow<Float?> = _anexo
 
     /** Envia um ficheiro escolhido pelo utilizador (fotografia, PDF, etc.). */
-    fun enviarAnexo(destino: String, uri: android.net.Uri) = viewModelScope.launch {
+    fun enviarAnexo(destino: String, uri: android.net.Uri) = viewModelScope.launch { enviarUmAnexo(destino, uri) }
+
+    /* ---- Partilhar a partir de outras apps ("Partilhar" → IssaFone) ---- */
+    data class Partilha(val uris: List<android.net.Uri>, val texto: String?) {
+        val descricao get() = when {
+            uris.size > 1 -> "${uris.size} ficheiros"
+            uris.size == 1 -> "1 ficheiro"
+            else -> "texto"
+        }
+    }
+    private val _partilha = MutableStateFlow<Partilha?>(null)
+    val partilha: StateFlow<Partilha?> = _partilha
+    fun receberPartilha(p: Partilha?) { _partilha.value = p }
+
+    /** Envia o que foi partilhado para [destino] (contacto ou grupo) e abre essa conversa. */
+    fun enviarPartilha(destino: String) {
+        val p = _partilha.value ?: return
+        _partilha.value = null
+        pedirConversa(destino)
+        viewModelScope.launch {
+            p.texto?.takeIf { it.isNotBlank() }?.let { xmpp.enviar(destino, it) }
+            p.uris.forEach { enviarUmAnexo(destino, it) }
+        }
+    }
+
+    private suspend fun enviarUmAnexo(destino: String, uri: android.net.Uri) {
         val ctx = getApplication<Application>()
         _anexo.value = 0f
         val ficheiro = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -94,7 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 java.io.File(pasta, nome).also { destinoF -> destinoF.delete(); f.renameTo(destinoF) }
             }.getOrNull()
         }
-        if (ficheiro == null) { _anexo.value = null; return@launch }
+        if (ficheiro == null) { _anexo.value = null; return }
         xmpp.enviarFicheiro(destino, ficheiro) { _anexo.value = it }
         _anexo.value = null
     }

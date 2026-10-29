@@ -67,6 +67,20 @@ class MainActivity : ComponentActivity() {
             }
             intent?.hasExtra(Notificacoes.EXTRA_CONVERSA) == true ->
                 vm.pedirConversa(intent.getStringExtra(Notificacoes.EXTRA_CONVERSA))
+            // "Partilhar" noutra app → IssaFone: escolhe-se depois para quem vai
+            intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE -> {
+                val uris = buildList {
+                    if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+                        androidx.core.content.IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                            ?.let { addAll(it) }
+                    } else {
+                        androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                            ?.let { add(it) }
+                    }
+                }
+                val texto = intent.getStringExtra(Intent.EXTRA_TEXT)
+                if (uris.isNotEmpty() || !texto.isNullOrBlank()) vm.receberPartilha(AppViewModel.Partilha(uris, texto))
+            }
         }
         // Evita repetir a ação se a Activity for recriada (ex.: rodar o ecrã)
         intent?.action = null
