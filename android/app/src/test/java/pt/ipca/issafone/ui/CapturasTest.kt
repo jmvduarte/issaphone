@@ -31,7 +31,7 @@ class CapturasTest {
         maxPercentDifference = 100.0,
         // O Paparazzi 1.3 só sabe desenhar com a plataforma 34; a app compila com a 36
         environment = detectEnvironment().run {
-            copy(compileSdkVersion = 34, platformDir = platformDir.replace("36", "34"))
+            copy(compileSdkVersion = 34)
         },
     )
 
