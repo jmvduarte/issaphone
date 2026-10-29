@@ -2,7 +2,7 @@
 #  - Com os Secrets da keystore (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
 #    ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD): APKs de release assinados com a chave
 #    privada → IssaFone.apk e IssaLink.apk (o Play Protect desconfia menos destes).
-#  - Sem eles: APKs de debug (chave de teste pública), como antes.
+#  - Sem eles: APKs de debug (chave de teste pública).
 #  - Cada build do main (e cada tag vX.Y) publica o APK numa Release do GitHub.
 
 name: Android build
