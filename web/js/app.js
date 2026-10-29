@@ -1482,6 +1482,9 @@ function ligarEventos() {
     e.target.value = '';
     if (!f || !UI.conversaCom) return;
     if (f.size > 50 * 1024 * 1024) { UI.aviso('O ficheiro é demasiado grande (máximo 50 MB).'); return; }
+    // Confirmar antes de enviar (evita mandar o ficheiro errado)
+    const tam = f.size >= 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`;
+    if (!confirm(`Enviar "${f.name}" (${tam}) para ${UI.tituloConversa(UI.conversaCom)}?`)) return;
     const barra = $('#progresso-anexo');
     barra.hidden = false; barra.value = 0;
     $('#btn-anexo').disabled = true;
