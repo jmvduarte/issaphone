@@ -27,6 +27,9 @@ class IssaFoneApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        guardarErros()
+        // Instalações antigas por terminar (do tempo em que a app se atualizava sozinha)
+        runCatching { packageManager.packageInstaller.mySessions.forEach { packageManager.packageInstaller.abandonSession(it.sessionId) } }
         sip = SipManager(this)
         xmpp = XmppManager(this)
         Notificacoes.criarCanais(this)
@@ -58,4 +61,29 @@ class IssaFoneApp : Application() {
         sip.desregistar()
         scope.launch { xmpp.desligar() }
     }
+
+    /**
+     * Se a app fechar com um erro, guarda-o e mostra-o numa notificação (para se poder
+     * enviar uma captura); na próxima abertura aparece também no ecrã.
+     */
+    private fun guardarErros() {
+        val anterior = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                val texto = "IssaFone ${BuildConfig.VERSION_NAME} · ${java.util.Date()}\n" + e.stackTraceToString().take(6000)
+                java.io.File(filesDir, ERRO).writeText(texto)
+                val nm = getSystemService(android.app.NotificationManager::class.java)
+                nm.createNotificationChannel(android.app.NotificationChannel("erros", "Erros", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+                nm.notify(99, androidx.core.app.NotificationCompat.Builder(this, "erros")
+                    .setSmallIcon(android.R.drawable.stat_notify_error)
+                    .setContentTitle("${BuildConfig.NOME_APP} fechou com um erro")
+                    .setContentText(e.toString().take(120))
+                    .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(texto.take(1500)))
+                    .build())
+            }
+            anterior?.uncaughtException(t, e)
+        }
+    }
+
+    companion object { const val ERRO = "ultimo-erro.txt" }
 }

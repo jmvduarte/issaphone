@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
         tratarIntent(intent)
         mostrarSobreBloqueioDuranteChamadas()
+        mostrarErroAnterior()
 
         // Desenha por baixo das barras do sistema (o degradê do cabeçalho vai até ao topo)
         enableEdgeToEdge()
@@ -85,5 +86,22 @@ class MainActivity : ComponentActivity() {
                 setTurnScreenOn(emChamada)
             }
         }
+    }
+
+    /** A app fechou com um erro da última vez: mostra-o, com opção de copiar. */
+    private fun mostrarErroAnterior() {
+        val f = java.io.File(filesDir, IssaFoneApp.ERRO)
+        if (!f.exists()) return
+        val texto = runCatching { f.readText() }.getOrDefault("")
+        f.delete()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("A app fechou com um erro")
+            .setMessage(texto.take(3000))
+            .setPositiveButton("Copiar") { _, _ ->
+                getSystemService(android.content.ClipboardManager::class.java)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("erro", texto))
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
     }
 }

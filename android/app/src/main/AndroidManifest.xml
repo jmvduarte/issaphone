@@ -60,6 +60,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".atualizacao.ResultadoInstalacaoReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".servico.BootReceiver"
             android:exported="true">
             <intent-filter>
