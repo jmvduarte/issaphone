@@ -1,9 +1,7 @@
 package pt.ipca.issafone.atualizacao
 
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +11,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import pt.ipca.issafone.BuildConfig
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -22,10 +19,7 @@ import java.net.URL
  *
  * Cada build do GitHub Actions publica a Release "android-N", com N = versionCode.
  * A app consulta a Release mais recente; se N for maior que a versão instalada,
- * descarrega o APK e instala-o com o PackageInstaller do Android.
- *
- * No Android 12+, depois de a app se ter atualizado a si própria uma vez, as
- * atualizações seguintes podem ser instaladas sem perguntar nada ao utilizador.
+ * avisa e abre o APK no browser para a pessoa o instalar.
  */
 object Atualizador {
 
@@ -102,81 +96,50 @@ object Atualizador {
         verificarEInstalar(ctx)
     }
 
+    /** Versão nova encontrada, à espera de a pessoa a descarregar. */
+    private var pendente: Versao? = null
+
     /**
-     * Procura, descarrega e instala. Seguro para chamar várias vezes: se já estiver
-     * uma atualização em curso, não faz nada. Com [manual] = true mostra sempre o
-     * resultado (inclusive "já tens a versão mais recente").
+     * Procura uma versão nova. A app já não se instala sozinha: o Play Protect trata
+     * apps que descarregam e instalam APKs como perigosas. Quando há versão nova,
+     * avisa no cabeçalho; ao tocar (ou com [manual]), o APK abre no browser e
+     * instala-se pelo instalador do Android, como qualquer APK.
      */
     suspend fun verificarEInstalar(ctx: Context, manual: Boolean = false) {
+        if (manual) pendente?.let { abrir(ctx, it); return }
         if (!emCurso.tryLock()) return
         ultimaProcura = System.currentTimeMillis()
         try {
             if (manual) _estado.value = "A procurar atualizações…"
             when (val r = procurar()) {
                 is Resultado.EmDia -> {
+                    pendente = null
                     if (manual) {
                         _estado.value = "Já tens a versão mais recente (${BuildConfig.VERSION_NAME})"
                         kotlinx.coroutines.delay(5000)
                         if (_estado.value?.startsWith("Já tens") == true) _estado.value = null
                     }
                 }
-                is Resultado.Erro -> _estado.value = "Não foi possível procurar atualizações: ${r.motivo}"
+                is Resultado.Erro -> if (manual) _estado.value = "Não foi possível procurar atualizações: ${r.motivo}"
                 is Resultado.Nova -> {
-                    val nova = r.versao
-                    _estado.value = "A descarregar a versão ${nova.nome}…"
-                    val apk = descarregar(ctx, nova)
-                    _estado.value = "A instalar a versão ${nova.nome}…"
-                    instalar(ctx, apk, nova)
+                    pendente = r.versao
+                    _estado.value = "Nova versão ${r.versao.nome} disponível · toca aqui para atualizar"
+                    if (manual) abrir(ctx, r.versao)
                 }
             }
         } catch (e: Exception) {
-            _estado.value = "Falha na atualização: ${e.message ?: e.javaClass.simpleName}"
+            if (manual) _estado.value = "Falha ao procurar atualizações: ${e.message ?: e.javaClass.simpleName}"
         } finally {
             emCurso.unlock()
         }
     }
 
-    private suspend fun descarregar(ctx: Context, v: Versao): File = withContext(Dispatchers.IO) {
-        val destino = File(ctx.cacheDir, "atualizacao.apk")
-        val con = (URL(v.urlApk).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 60_000
-            instanceFollowRedirects = true
-        }
-        try {
-            if (con.responseCode != 200) error("HTTP ${con.responseCode} ao descarregar")
-            con.inputStream.use { entrada -> destino.outputStream().use { entrada.copyTo(it) } }
-        } finally {
-            con.disconnect()
-        }
-        destino
-    }
-
-    private suspend fun instalar(ctx: Context, apk: File, v: Versao) = withContext(Dispatchers.IO) {
-        val instalador = ctx.packageManager.packageInstaller
-        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-            setAppPackageName(ctx.packageName)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                setPackageSource(PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE)
-            }
-        }
-        val id = instalador.createSession(params)
-        instalador.openSession(id).use { sessao ->
-            sessao.openWrite("IssaFone.apk", 0, apk.length()).use { saida ->
-                apk.inputStream().use { it.copyTo(saida) }
-                sessao.fsync(saida)
-            }
-            // FLAG_MUTABLE: o sistema acrescenta o resultado ao Intent
-            val resultado = PendingIntent.getBroadcast(
-                ctx, id,
-                Intent(ctx, ResultadoInstalacaoReceiver::class.java)
-                    .putExtra(ResultadoInstalacaoReceiver.EXTRA_VERSAO, v.nome),
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            sessao.commit(resultado.intentSender)
-        }
+    /** Abre o APK no browser: descarrega-o e o Android pergunta se o queres instalar. */
+    private fun abrir(ctx: Context, v: Versao) {
+        runCatching {
+            ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(v.urlApk))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            _estado.value = "Abre o ficheiro descarregado para instalar a versão ${v.nome}"
+        }.onFailure { _estado.value = "Não foi possível abrir o browser para descarregar a versão ${v.nome}" }
     }
 }

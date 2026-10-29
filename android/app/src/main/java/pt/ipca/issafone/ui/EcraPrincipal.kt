@@ -255,7 +255,8 @@ internal fun Cabecalho(
         }
         atualizacao?.let {
             Spacer(Modifier.height(8.dp))
-            Text(it, color = Color.White, fontSize = 12.sp, maxLines = 2)
+            Text(it, color = Color.White, fontSize = 12.sp, maxLines = 2,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onAtualizar))
         }
     }
 }
