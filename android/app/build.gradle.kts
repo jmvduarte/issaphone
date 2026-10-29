@@ -8,12 +8,13 @@ plugins {
 
 android {
     namespace = "pt.ipca.issafone"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "pt.ipca.issafone"
         minSdk = 26
-        targetSdk = 34
+        // O Play Protect bloqueia apps com targetSdk mais de 2 níveis abaixo do Android do telemóvel
+        targetSdk = 36
         // No GitHub Actions, cada build tem um número maior que o anterior:
         // é isso que permite à app saber que existe uma versão nova.
         val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
