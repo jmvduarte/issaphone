@@ -45,7 +45,9 @@ function completarConfig(c) {
     // se o servidor ainda não tiver o reencaminhamento, a 443 falha logo e usa-se a porta direta.
     urlsSip: (c.wsSip || '').trim() ? [c.wsSip.trim()] : [`wss://${host}/issafone-ws/sip`, `wss://${host}:8089/ws`],
     urlsXmpp: (c.wsXmpp || '').trim() ? [c.wsXmpp.trim()] : [`wss://${host}/issafone-ws/xmpp`, `wss://${host}:7443/ws/`],
-    stun: (c.stun || '').trim(),
+    // Sem STUN o browser só conhece endereços privados (escondidos como "xxxx.local")
+    // e o Asterisk não tem para onde mandar o som: a chamada fica muda ou cai ao atender.
+    stun: (c.stun || '').trim() || 'stun:stun.l.google.com:19302',
     original,
   };
 }
@@ -411,6 +413,9 @@ const Sip = {
       });
     };
     s.on('peerconnection', (e) => ligarMedia(e.peerconnection));
+    // Não esperar pela recolha completa de candidatos (pode levar >10 s em redes móveis):
+    // assim que há o endereço público (srflx), a oferta/resposta segue.
+    s.on('icecandidate', (e) => { if (/ typ srflx /.test(e.candidate?.candidate || '')) e.ready(); });
     ligarMedia(s.connection);
 
     s.on('progress', () => UI.estadoChamada(recebida ? 'A receber chamada' : 'A tocar…'));
