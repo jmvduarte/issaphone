@@ -13,7 +13,7 @@ android {
     defaultConfig {
         applicationId = "pt.ipca.issafone"
         minSdk = 26
-        // O Play Protect bloqueia apps com targetSdk mais de 2 níveis abaixo do Android do telemóvel
+        // O Play Protect bloqueia apps com targetSdk mais de 2 níveis abaixo do Android do telemóvel (manter atualizado)
         targetSdk = 36
         // No GitHub Actions, cada build tem um número maior que o anterior:
         // é isso que permite à app saber que existe uma versão nova.
