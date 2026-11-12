@@ -436,7 +436,12 @@ const Sip = {
     s.on('accepted', () => this.emCurso());
     s.on('confirmed', () => this.emCurso());
     s.on('ended', (e) => this.fim(MOTIVOS[e.cause] || 'Chamada terminada'));
-    s.on('failed', (e) => this.fim(MOTIVOS[e.cause] || `Falhou: ${e.cause}`));
+    s.on('failed', (e) => {
+      // Mostra o código SIP real (ex.: 488 Not Acceptable Here) para se perceber a falha
+      const m = e.message, cod = m?.status_code ? ` (${m.status_code} ${m.reason_phrase || ''})`.replace(' )', ')') : '';
+      console.warn('Chamada falhou', e.originator, e.cause, m?.status_code, m?.reason_phrase);
+      this.fim((MOTIVOS[e.cause] || `Falhou: ${e.cause}`) + cod);
+    });
 
     UI.abrirChamada({ nome, numero, recebida, ofereceVideo });
     if (recebida) {
