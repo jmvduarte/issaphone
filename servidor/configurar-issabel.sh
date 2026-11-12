@@ -307,15 +307,31 @@ else aviso "Não consegui pôr o stunaddr no $RTP (sem ele a webapp pode ficar s
 cat > /usr/local/sbin/issafone-ip-publico <<'EOS'
 #!/bin/bash
 # IssaFone: mantém o IP público no rtp.conf ([ice_host_candidates]) para a webapp ter som.
+# O cron corre com PATH=/usr/bin:/bin; sem isto o "ip" e o "asterisk" (em /usr/sbin) falhavam.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 DOMINIO=$(cat /etc/issafone/dominio 2>/dev/null)
 RTP=/etc/asterisk/rtp.conf
+touch "$RTP"
+# O Issabel reescreve o rtp.conf ao "Aplicar": repõe também o STUN
+mudou=0
+if ! grep -q '^stunaddr=' "$RTP"; then
+  if grep -qE '^\s*\[general\]' "$RTP"; then
+    sed -i -E '0,/^\s*\[general\]/s//&\nstunaddr=stun.l.google.com:19302/' "$RTP"
+  else
+    printf '\n[general]\nstunaddr=stun.l.google.com:19302\n' >> "$RTP"
+  fi
+  mudou=1
+fi
 PUB=$(getent ahostsv4 "$DOMINIO" 2>/dev/null | awk 'NR==1{print $1}')
 [[ $PUB =~ ^[0-9]+(\.[0-9]+){3}$ ]] || PUB=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null)
 LAN=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src") print $(i+1)}' | head -1)
 [[ $PUB =~ ^[0-9]+(\.[0-9]+){3}$ && $LAN =~ ^[0-9]+(\.[0-9]+){3}$ ]] || exit 0
 novo=$(printf '%s\n%s\n%s\n%s' "; >>> IssaFone IP publico (gerado pelo issafone-ip-publico; nao editar)" "[ice_host_candidates]" "$LAN => $PUB" "; <<< IssaFone IP publico")
 atual=$(sed -n '/^; >>> IssaFone IP publico/,/^; <<< IssaFone IP publico/p' "$RTP")
-[ "$novo" = "$atual" ] && exit 0
+if [ "$novo" = "$atual" ]; then
+  [ $mudou = 1 ] && asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null 2>&1
+  exit 0
+fi
 sed -i '/^; >>> IssaFone IP publico/,/^; <<< IssaFone IP publico/d' "$RTP"
 printf '\n%s\n' "$novo" >> "$RTP"
 asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null 2>&1
@@ -398,6 +414,9 @@ if [ "$(cat "$ESTADO" 2>/dev/null)" != "$assinatura" ]; then
   fi
   echo "$assinatura" > "$ESTADO"
 fi
+
+# O "Aplicar" do Issabel reescreve o rtp.conf e apaga o IP público/STUN: repor já
+[ -x /usr/local/sbin/issafone-ip-publico ] && /usr/local/sbin/issafone-ip-publico
 EOF
 chmod +x /usr/local/sbin/issafone-webrtc
 
@@ -416,6 +435,7 @@ Description=IssaFone: vigiar alteracoes as extensoes do Issabel
 
 [Path]
 PathChanged=/etc/asterisk/sip_additional.conf
+PathChanged=/etc/asterisk/rtp.conf
 
 [Install]
 WantedBy=multi-user.target
