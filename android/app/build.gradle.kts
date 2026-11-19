@@ -20,9 +20,6 @@ android {
         val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = build
         versionName = "1.0.$build"
-
-        // Repositório onde a app procura atualizações (Releases do GitHub)
-        buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issaphone\"")
     }
 
     // Duas apps a partir do mesmo código:
@@ -36,6 +33,8 @@ android {
             resValue("string", "app_name", "IssaFone")
             buildConfigField("String", "NOME_APP", "\"IssaFone\"")
             buildConfigField("String", "SERVIDOR_PADRAO", "\"rsi-a36357.ddns.net\"")
+            // Atualizações: Releases "android-N" do repositório do projeto
+            buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issaphone\"")
             buildConfigField("String", "PREFIXO_RELEASE", "\"android-\"")
             buildConfigField("String", "NOME_APK", "\"IssaFone.apk\"")
             // O servidor do projeto tem SIP sobre TLS e SRTP obrigatórios
@@ -47,7 +46,9 @@ android {
             resValue("string", "app_name", "IssaLink")
             buildConfigField("String", "NOME_APP", "\"IssaLink\"")
             buildConfigField("String", "SERVIDOR_PADRAO", "\"\"")
-            buildConfigField("String", "PREFIXO_RELEASE", "\"issalink-\"")
+            // Atualizações: Releases "android-N" do repositório próprio do IssaLink
+            buildConfigField("String", "REPO_ATUALIZACOES", "\"jmvduarte/issalink\"")
+            buildConfigField("String", "PREFIXO_RELEASE", "\"android-\"")
             buildConfigField("String", "NOME_APK", "\"IssaLink.apk\"")
             // Qualquer Issabel: usa TLS se o servidor o tiver; senão UDP normal, como o Zoiper
             buildConfigField("String", "TRANSPORTE_PADRAO", "\"auto\"")

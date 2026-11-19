@@ -78,6 +78,8 @@ jobs:
   publicar:
     needs: construir
     runs-on: ubuntu-latest
+    env:
+      ISSALINK_TOKEN: ${{ secrets.ISSALINK_TOKEN }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -86,24 +88,47 @@ jobs:
 
       - run: ls -la instaladores
 
-      - name: Publicar Release
+      - name: Publicar IssaFone (este repositório)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-${{ github.run_number }}
-          name: App de computador ${{ github.run_number }}
+          name: IssaFone para computador 1.0.${{ github.run_number }}
           make_latest: false
-          files: instaladores/*
+          files: instaladores/IssaFone-*
           body: |
-            **IssaFone e IssaLink para computador** (versão 1.0.${{ github.run_number }})
+            **IssaFone para computador** (versão 1.0.${{ github.run_number }})
 
-            | Sistema | IssaFone (servidor do projeto) | IssaLink (qualquer Issabel) |
-            |---|---|---|
-            | Windows 10/11 | `IssaFone-win-x64.exe` | `IssaLink-win-x64.exe` |
-            | Linux (qualquer) | `IssaFone-linux-x86_64.AppImage` | `IssaLink-linux-x86_64.AppImage` |
-            | Ubuntu/Debian | `IssaFone-linux-amd64.deb` | `IssaLink-linux-amd64.deb` |
+            | Sistema | Ficheiro |
+            |---|---|
+            | Windows 10/11 | `IssaFone-win-x64.exe` |
+            | Linux (qualquer) | `IssaFone-linux-x86_64.AppImage` |
+            | Ubuntu/Debian | `IssaFone-linux-amd64.deb` |
 
             - **Windows:** o instalador não está assinado; se aparecer "O Windows protegeu o computador", carrega em *Mais informações → Executar mesmo assim*.
             - **AppImage:** `chmod +x IssaFone-linux-x86_64.AppImage` e abrir com duplo clique.
             - **.deb:** `sudo apt install ./IssaFone-linux-amd64.deb`.
 
             A app fica na bandeja do sistema e arranca com o computador, para receberes chamadas com a janela fechada.
+
+      - name: Publicar IssaLink (repositório issalink)
+        if: env.ISSALINK_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: jmvduarte/issalink
+          token: ${{ secrets.ISSALINK_TOKEN }}
+          tag_name: desktop-${{ github.run_number }}
+          name: IssaLink para computador 1.0.${{ github.run_number }}
+          make_latest: false
+          files: instaladores/IssaLink-*
+          body: |
+            **IssaLink para computador** (versão 1.0.${{ github.run_number }}) — pede o endereço do teu servidor na primeira vez.
+
+            | Sistema | Ficheiro |
+            |---|---|
+            | Windows 10/11 | `IssaLink-win-x64.exe` |
+            | Linux (qualquer) | `IssaLink-linux-x86_64.AppImage` |
+            | Ubuntu/Debian | `IssaLink-linux-amd64.deb` |
+
+            Precisa do servidor preparado com o [guia](https://github.com/jmvduarte/issalink/blob/main/GUIA-SERVIDOR.md) (usa a webapp do servidor).
+            - **Windows:** instalador não assinado: *Mais informações → Executar mesmo assim*.
+            - **AppImage:** `chmod +x IssaLink-linux-x86_64.AppImage` · **.deb:** `sudo apt install ./IssaLink-linux-amd64.deb`.

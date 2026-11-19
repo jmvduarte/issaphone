@@ -21,6 +21,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Token para publicar no repositório jmvduarte/issalink (Settings → Secrets → ISSALINK_TOKEN)
+      ISSALINK_TOKEN: ${{ secrets.ISSALINK_TOKEN }}
     defaults:
       run:
         working-directory: android
@@ -91,21 +94,36 @@ jobs:
           path: android/out/*.apk
           retention-days: 14
 
-      # IssaLink: a mesma app sem os dados do Issabel do projeto, para qualquer pessoa usar
-      # na sua central. Release "issalink-N" (não fica como "latest", que é a do IssaFone).
-      - name: Publicar Release do IssaLink
+      # IssaLink: publicado no seu próprio repositório (jmvduarte/issalink), Release "android-N".
+      - name: Publicar IssaLink no repositório issalink
+        if: github.ref == 'refs/heads/main' && env.ISSALINK_TOKEN != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: jmvduarte/issalink
+          token: ${{ secrets.ISSALINK_TOKEN }}
+          tag_name: ${{ format('android-{0}', github.run_number) }}
+          name: ${{ format('IssaLink para Android 1.0.{0}', github.run_number) }}
+          make_latest: true
+          body: |
+            **IssaLink para Android** — chamadas SIP (voz e vídeo) e chat para qualquer central **Issabel 4**.
+
+            - Telemóveis atuais: **IssaLink-arm64-v8a.apk** · se não instalar: **IssaLink.apk** (universal).
+            - Entra com o endereço do servidor, a extensão e a palavra-passe. Sem preparar o servidor funcionam só as chamadas (UDP, como o Zoiper); com o [guia](https://github.com/jmvduarte/issalink/blob/main/GUIA-SERVIDOR.md) tens chamadas cifradas, chat, anexos e a webapp.
+          files: android/out-issalink/*.apk
+
+      # Transição: as apps IssaLink antigas procuram atualizações aqui (issalink-N).
+      # Esta Release leva-as para a versão que já procura no repositório issalink.
+      - name: Publicar Release do IssaLink (transição)
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ format('issalink-{0}', github.run_number) }}
-          name: ${{ format('IssaLink Android (build {0})', github.run_number) }}
+          name: ${{ format('IssaLink Android (build {0}) — mudou para jmvduarte/issalink', github.run_number) }}
           target_commitish: ${{ github.sha }}
           make_latest: false
           body: |
-            **IssaLink** — softphone (chamadas SIP, vídeo e chat XMPP) para qualquer central **Issabel 4**.
-
-            1. Prepara o servidor com o script `servidor/configurar-issabel.sh` deste repositório (instruções no README).
-            2. Instala o **IssaLink.apk** no Android e entra com o endereço do servidor, a extensão e a palavra-passe.
+            O IssaLink passou a ter repositório próprio: **https://github.com/jmvduarte/issalink**
+            Instala esta versão; as seguintes chegam de lá.
           files: android/out-issalink/*.apk
 
       # Cada build do main fica numa Release própria (android-N). O link
