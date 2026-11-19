@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self'">
+<title>Configurar</title>
+<style>
+  :root { --fundo:#0d1117; --cartao:#161b22; --texto:#e6edf3; --suave:#9aa4b2; --erro:#ff7b72; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--fundo);
+         color:var(--texto); font:15px/1.45 system-ui, "Segoe UI", Ubuntu, sans-serif; }
+  .topo { position:fixed; inset:0 0 auto 0; height:46vh; z-index:-1;
+          background:linear-gradient(135deg,#2F5BFF,#14C8B4); border-radius:0 0 40px 40px; }
+  main { width:min(420px, calc(100% - 32px)); text-align:center; }
+  img { width:92px; height:92px; border-radius:26px; box-shadow:0 12px 30px rgba(0,0,0,.35); }
+  h1 { margin:14px 0 2px; font-size:28px; color:#fff; }
+  .sub { color:rgba(255,255,255,.85); margin:0 0 26px; }
+  .cartao { background:var(--cartao); border-radius:24px; padding:22px; text-align:left;
+            box-shadow:0 18px 40px rgba(0,0,0,.35); }
+  h2 { margin:0 0 6px; font-size:20px; }
+  p { color:var(--suave); margin:0 0 14px; }
+  input { width:100%; padding:13px 14px; border-radius:14px; border:1px solid #30363d;
+          background:#0d1117; color:var(--texto); font-size:16px; }
+  button { width:100%; margin-top:14px; padding:14px; border:0; border-radius:14px; cursor:pointer;
+           background:linear-gradient(135deg,#2F5BFF,#14C8B4); color:#fff; font-size:16px; font-weight:600; }
+  button.secundario { background:transparent; color:var(--texto); border:1px solid #30363d; }
+  .erro { color:var(--erro); margin-top:12px; min-height:1.4em; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div class="topo"></div>
+<main>
+  <img src="../recursos/icone.png" alt="">
+  <h1 id="nome">IssaFone</h1>
+  <p class="sub">Chamadas e chat da tua empresa</p>
+
+  <form class="cartao" id="configurar" hidden>
+    <h2>Servidor</h2>
+    <p>Indica o endereço da tua central Issabel (preparada com o script do <span class="nome">IssaFone</span>). Depois entras com a tua extensão.</p>
+    <input id="servidor" placeholder="ex.: pbx.empresa.pt" autocomplete="off" spellcheck="false" autofocus>
+    <button type="submit" id="continuar">Continuar</button>
+    <div class="erro" id="msg"></div>
+  </form>
+
+  <div class="cartao" id="erro" hidden>
+    <h2>Sem ligação ao servidor</h2>
+    <p id="motivo"></p>
+    <p>Confirma a ligação à Internet e se o servidor está ligado.</p>
+    <button id="denovo">Tentar outra vez</button>
+    <button class="secundario" id="mudar">Mudar de servidor</button>
+  </div>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  const nome = q.get('nome') || 'IssaFone';
+  document.title = nome;
+  document.getElementById('nome').textContent = nome;
+  document.querySelectorAll('.nome').forEach((e) => { e.textContent = nome; });
+  const mostrar = (modo) => {
+    document.getElementById('configurar').hidden = modo !== 'configurar';
+    document.getElementById('erro').hidden = modo !== 'erro';
+  };
+  mostrar(q.get('modo'));
+  document.getElementById('servidor').value = q.get('servidor') || '';
+  document.getElementById('motivo').textContent = q.get('motivo') || '';
+
+  document.getElementById('configurar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const botao = document.getElementById('continuar');
+    const msg = document.getElementById('msg');
+    botao.disabled = true; botao.textContent = 'A ligar…'; msg.textContent = '';
+    const r = await window.issaDesktop.definirServidor(document.getElementById('servidor').value);
+    if (!r.ok) { msg.textContent = r.erro; botao.disabled = false; botao.textContent = 'Continuar'; }
+  });
+  document.getElementById('denovo').addEventListener('click', () => window.issaDesktop.tentarDeNovo());
+  document.getElementById('mudar').addEventListener('click', () => mostrar('configurar'));
+</script>
+</body>
+</html>

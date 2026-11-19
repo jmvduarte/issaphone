@@ -1,0 +1,109 @@
+# App de computador (Windows e Linux) do IssaFone e do IssaLink.
+# Cada push que mexe em desktop/ gera os instaladores, testa o arranque de cada um
+# e publica-os na Release "desktop-N" (sem a marcar como a mais recente: essa é a
+# do Android, que a app do telemóvel usa para procurar atualizações).
+name: App de computador
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  construir:
+    name: ${{ matrix.marca }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        marca: [issafone, issalink]
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+
+      - name: Gerar instaladores
+        shell: bash
+        env:
+          MARCA: ${{ matrix.marca }}
+          VERSAO: 1.0.${{ github.run_number }}
+        run: node construir.js
+
+      # Arranca a app (já empacotada) e confirma que abre a webapp do servidor
+      # (IssaFone) ou a página de configuração (IssaLink, que pede o servidor).
+      - name: Testar arranque (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a timeout 90 ./dist/${{ matrix.marca }}/linux-unpacked/${{ matrix.marca }} \
+            --no-sandbox --teste=$PWD/resultado.txt || true
+          cat resultado.txt 2>/dev/null || echo "sem resultado"
+          if grep -q '^OK' resultado.txt 2>/dev/null; then echo "::notice::$(cat resultado.txt)"; else echo "::error::Arranque falhou: $(cat resultado.txt 2>/dev/null)"; exit 1; fi
+
+      - name: Testar arranque (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $nome = if ('${{ matrix.marca }}' -eq 'issafone') { 'IssaFone' } else { 'IssaLink' }
+          $res = Join-Path $PWD 'resultado.txt'
+          $p = Start-Process -FilePath ".\dist\${{ matrix.marca }}\win-unpacked\$nome.exe" -ArgumentList "--teste=$res" -PassThru
+          if (-not $p.WaitForExit(90000)) { $p.Kill() }
+          $txt = if (Test-Path $res) { Get-Content $res -Raw } else { 'sem resultado' }
+          Write-Host $txt
+          if ($txt -match '^OK') { Write-Host "::notice::$txt" } else { Write-Host "::error::Arranque falhou: $txt"; exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.marca }}-${{ matrix.os }}
+          path: |
+            desktop/dist/${{ matrix.marca }}/*.exe
+            desktop/dist/${{ matrix.marca }}/*.AppImage
+            desktop/dist/${{ matrix.marca }}/*.deb
+          if-no-files-found: error
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: instaladores
+          merge-multiple: true
+
+      - run: ls -la instaladores
+
+      - name: Publicar Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-${{ github.run_number }}
+          name: App de computador ${{ github.run_number }}
+          make_latest: false
+          files: instaladores/*
+          body: |
+            **IssaFone e IssaLink para computador** (versão 1.0.${{ github.run_number }})
+
+            | Sistema | IssaFone (servidor do projeto) | IssaLink (qualquer Issabel) |
+            |---|---|---|
+            | Windows 10/11 | `IssaFone-win-x64.exe` | `IssaLink-win-x64.exe` |
+            | Linux (qualquer) | `IssaFone-linux-x86_64.AppImage` | `IssaLink-linux-x86_64.AppImage` |
+            | Ubuntu/Debian | `IssaFone-linux-amd64.deb` | `IssaLink-linux-amd64.deb` |
+
+            - **Windows:** o instalador não está assinado; se aparecer "O Windows protegeu o computador", carrega em *Mais informações → Executar mesmo assim*.
+            - **AppImage:** `chmod +x IssaFone-linux-x86_64.AppImage` e abrir com duplo clique.
+            - **.deb:** `sudo apt install ./IssaFone-linux-amd64.deb`.
+
+            A app fica na bandeja do sistema e arranca com o computador, para receberes chamadas com a janela fechada.

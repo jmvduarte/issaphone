@@ -1,0 +1,21 @@
+{
+  "name": "issafone-desktop",
+  "productName": "IssaFone",
+  "version": "1.0.0",
+  "description": "IssaFone para computador (Windows e Linux): chamadas e chat para Issabel",
+  "main": "main.js",
+  "author": {
+    "name": "Jorge Duarte",
+    "email": "issafone@users.noreply.github.com"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "construir": "node construir.js"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  }
+}

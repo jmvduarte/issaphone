@@ -447,6 +447,8 @@ const Sip = {
     if (recebida) {
       Toque.tocar();
       Avisos.mostrar((ofereceVideo ? 'Videochamada de ' : 'Chamada de ') + nome, NOME_APP, 'chamada');
+      // App de computador (Windows/Linux): traz a janela para a frente
+      window.issaDesktop?.chamada?.(nome);
     }
   },
 
