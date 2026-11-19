@@ -31,6 +31,7 @@ builder.build({
       productName: M.nome,
       version: process.env.VERSAO || '1.0.0',
       description: `${M.nome}: chamadas e chat para Issabel`,
+      homepage: 'https://github.com/jmvduarte/issaphone',
       author: { name: 'Jorge Duarte', email: 'issafone@users.noreply.github.com' },
     },
     files: ['main.js', 'preload.js', 'marca.json', 'paginas/**', 'recursos/**'],
