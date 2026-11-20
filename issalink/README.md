@@ -14,12 +14,17 @@
 
 ## Descarregar
 
-| Plataforma | Onde |
+| Plataforma | Descarregar |
 |---|---|
 | **Android 8+** | [IssaLink-arm64-v8a.apk](https://github.com/jmvduarte/issalink/releases/latest/download/IssaLink-arm64-v8a.apk) (telemóveis atuais) · [IssaLink.apk](https://github.com/jmvduarte/issalink/releases/latest/download/IssaLink.apk) (universal) |
-| **Windows 10/11** | `IssaLink-win-x64.exe` na Release **desktop** mais recente, em [Releases](https://github.com/jmvduarte/issalink/releases) |
-| **Linux** | `IssaLink-linux-x86_64.AppImage` (qualquer distribuição) ou `IssaLink-linux-amd64.deb` (Ubuntu/Debian), na mesma Release |
+| **Windows 10/11** | [IssaLink-win-x64.exe](https://github.com/jmvduarte/issalink/releases/download/computador/IssaLink-win-x64.exe) |
+| **Linux** (qualquer distribuição) | [IssaLink-linux-x86_64.AppImage](https://github.com/jmvduarte/issalink/releases/download/computador/IssaLink-linux-x86_64.AppImage) |
+| **Ubuntu / Debian** | [IssaLink-linux-amd64.deb](https://github.com/jmvduarte/issalink/releases/download/computador/IssaLink-linux-amd64.deb) |
 | **PC e iPhone (browser)** | `https://O_TEU_SERVIDOR/issalink/` (instalada pelo script do servidor) · ou [jmvduarte.github.io/issalink](https://jmvduarte.github.io/issalink/), que pede o servidor |
+
+Os links são sempre da versão mais recente. Versões anteriores: [Releases](https://github.com/jmvduarte/issalink/releases).
+
+A **app de computador** funciona de duas formas: num Issabel preparado com o script tem tudo (chamadas cifradas, chat, anexos, videochamadas); num Issabel sem preparação usa **"Entrar só com chamadas"** (servidor, extensão e palavra-passe), como o Zoiper.
 
 Avisos ao instalar (normais para apps fora das lojas):
 - **Android:** autoriza "instalar apps de origem desconhecida". Se o Play Protect avisar, escolhe instalar mesmo assim.
