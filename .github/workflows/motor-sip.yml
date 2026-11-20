@@ -44,6 +44,15 @@ jobs:
           ls -la out && ldd out/baresip
       - name: Testar
         run: python3 desktop/motor/testar.py out/baresip
+      # Registo, chamada feita, chamada recebida e "ocupado" contra um PBX de teste
+      # (placa de som nula, porque a máquina do GitHub não tem som)
+      - name: Testar chamadas
+        run: |
+          printf 'pcm.!default { type null }\n' > ~/.asoundrc
+          IP=$(hostname -I | awk '{print $1}')
+          python3 desktop/motor/pbx_teste.py "$IP" > pbx.out 2>&1 &
+          sleep 1
+          node desktop/motor/chamadas_teste.js "$PWD/out/baresip" "$IP"
       - uses: actions/upload-artifact@v4
         with:
           name: motor-linux

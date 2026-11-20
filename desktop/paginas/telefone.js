@@ -186,12 +186,14 @@ function motivoRegisto(p) {
 }
 
 D.aoEvento(async (ev) => {
-  if (ev.class === 'register') {
+  const tipo = String(ev.type || '');
+  // Registo: o baresip 4.x usa class "ua"; conta o tipo do evento
+  if (/^(REGISTER|REGISTERING|UNREGISTER|FALLBACK)/.test(tipo)) {
     tratarRegisto(ev);
     return;
   }
   if (ev.class === 'motor' && ev.type === 'PAROU') { estado('O motor SIP parou; a reiniciar…', 'erro'); return; }
-  if (ev.class !== 'call') return;
+  if (!tipo.startsWith('CALL_')) return;
 
   const numero = numeroDe(ev.peeruri);
   switch (ev.type) {
@@ -211,8 +213,9 @@ D.aoEvento(async (ev) => {
     case 'CALL_RINGING':
       if (atual?.tipo === 'feita') $('estadoChamada').textContent = 'A tocar…';
       break;
+    case 'CALL_ANSWERED':
     case 'CALL_ESTABLISHED':
-      if (!atual) return;
+      if (!atual || atual.inicio) return;
       Toque.parar();
       atual.id = ev.id; atual.atendida = true; atual.inicio = Date.now();
       mostrarChamada('curso');

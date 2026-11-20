@@ -71,7 +71,7 @@ async function arrancarMotor() {
     motor = new Motor(caminhoMotor(), path.join(app.getPath('userData'), 'sip'));
     motor.on('evento', (ev) => {
       janela?.webContents.send('motor-evento', ev);
-      if (ev.class === 'call' && ev.type === 'CALL_INCOMING') {
+      if (ev.type === 'CALL_INCOMING') {
         mostrar();
         janela?.flashFrame(true);
       }

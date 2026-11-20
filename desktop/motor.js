@@ -135,7 +135,8 @@ class Motor extends EventEmitter {
         this.pendentes.get(msg.token)(msg);
         this.pendentes.delete(msg.token);
       } else if (msg.event) {
-        if (msg.class === 'register') { this.registo = msg.type; this.ultimoRegisto = msg; }
+        // O baresip 4.x anuncia o registo com class "ua" (antes "register"): conta o tipo
+        if (/^(REGISTER|REGISTERING|UNREGISTER|FALLBACK)/.test(msg.type || '')) { this.registo = msg.type; this.ultimoRegisto = msg; }
         this.emit('evento', msg);
       }
     }
@@ -157,8 +158,8 @@ class Motor extends EventEmitter {
   async entrar({ servidor, extensao, palavraPasse, transporte = 'udp', nome = '' }) {
     await this.comando('uadel', this.aor).catch(() => {});
     const [host, porta] = String(servidor).split(':');
-    this.aor = `sip:${extensao}@${host}`;
-    this.dominio = host;
+    this.aor = `sip:${extensao}@${host}${porta ? `:${porta}` : ''}`;
+    this.dominio = `${host}${porta ? `:${porta}` : ''}`; // as chamadas vão para o mesmo servidor e porta
     const destino = `${host}${porta ? `:${porta}` : ''}`;
     const nomeTxt = nome ? `"${nome.replace(/"/g, '')}" ` : '';
     const pass = String(palavraPasse).replace(/;/g, '%3B');
@@ -166,8 +167,6 @@ class Motor extends EventEmitter {
       `;auth_pass=${pass};regint=60;answermode=manual;audio_codecs=pcma,pcmu;dtmfmode=rtpevent;video_codecs=;mwi=no`;
     this.ultimoRegisto = null;
     const r = await this.comando('uanew', linha);
-    // Garante que o registo arranca já (intervalo de 60 s) para a conta acabada de criar
-    if (r.ok) await this.comando('uafind', this.aor).then(() => this.comando('uareg', '60')).catch(() => {});
     return r;
   }
 
