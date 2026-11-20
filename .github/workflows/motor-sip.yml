@@ -1,0 +1,89 @@
+# Motor SIP da app de computador (modo "Issabel normal", sem preparar o servidor):
+# compila o baresip (+ libre) para Windows x64 e Linux x86_64, testa-o e guarda o
+# executável como artefacto, para o workflow "App de computador" o incluir nos instaladores.
+# O baresip é BSD-3-Clause (licença no ficheiro desktop/motor/LICENCAS.txt).
+name: Motor SIP (baresip)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/motor/**'
+      - '.github/workflows/motor-sip.yml'
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  VERSAO_BARESIP: v4.12.0
+  MODULOS_COMUNS: g711;auconv;auresamp;account;menu;ctrl_tcp
+
+jobs:
+  linux:
+    # O mais antigo possível, para o executável correr em distribuições antigas (glibc)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependências
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build libpulse-dev libasound2-dev
+      - name: Código do re e do baresip
+        run: |
+          git clone -q --depth 1 -b "$VERSAO_BARESIP" https://github.com/baresip/re /tmp/re
+          git clone -q --depth 1 -b "$VERSAO_BARESIP" https://github.com/baresip/baresip /tmp/baresip
+      - name: Compilar
+        run: |
+          P=/tmp/pfx
+          cmake -S /tmp/re -B /tmp/re/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DLIBRE_BUILD_SHARED=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON -DCMAKE_INSTALL_PREFIX=$P
+          cmake --build /tmp/re/b && cmake --install /tmp/re/b
+          cmake -S /tmp/baresip -B /tmp/baresip/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSTATIC=ON -DCMAKE_PREFIX_PATH=$P -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+            -DMODULES="$MODULOS_COMUNS;pulse;alsa"
+          cmake --build /tmp/baresip/b
+          mkdir -p out && cp /tmp/baresip/b/baresip out/ && strip out/baresip
+          ls -la out && ldd out/baresip
+      - name: Testar
+        run: python3 desktop/motor/testar.py out/baresip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: motor-linux
+          path: out/baresip
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: git
+          pacboy: gcc:p cmake:p ninja:p
+      - name: Código do re e do baresip
+        run: |
+          git clone -q --depth 1 -b "$VERSAO_BARESIP" https://github.com/baresip/re /tmp/re
+          git clone -q --depth 1 -b "$VERSAO_BARESIP" https://github.com/baresip/baresip /tmp/baresip
+      - name: Compilar
+        run: |
+          P=/tmp/pfx
+          cmake -S /tmp/re -B /tmp/re/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DLIBRE_BUILD_SHARED=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON -DCMAKE_INSTALL_PREFIX=$P
+          cmake --build /tmp/re/b && cmake --install /tmp/re/b
+          cmake -S /tmp/baresip -B /tmp/baresip/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DSTATIC=ON -DCMAKE_PREFIX_PATH=$P -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+            -DCMAKE_EXE_LINKER_FLAGS="-static" \
+            -DMODULES="$MODULOS_COMUNS;wasapi"
+          cmake --build /tmp/baresip/b
+          mkdir -p out && cp /tmp/baresip/b/baresip.exe out/ && strip out/baresip.exe
+          ls -la out
+          # Só deve depender de DLLs do Windows
+          objdump -p out/baresip.exe | grep -i "DLL Name" || true
+      - name: Testar
+        shell: pwsh
+        run: python desktop/motor/testar.py out/baresip.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: motor-windows
+          path: out/baresip.exe
