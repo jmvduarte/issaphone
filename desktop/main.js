@@ -336,7 +336,8 @@ async function testarMotor() {
     await motor.parar();
     app.exit(a.ok && b.ok ? 0 : 1);
   } catch (e) {
-    fs.writeFileSync(TESTE, `FALHA motor ${e.message}\n`);
+    const log = (motor?.ultimoLog() || '').replace(/\x1b\[[0-9;]*m/g, '').replace(/\s+/g, ' ');
+    fs.writeFileSync(TESTE, `FALHA motor ${e.message} | registo: ${log}\n`);
     app.exit(1);
   }
 }

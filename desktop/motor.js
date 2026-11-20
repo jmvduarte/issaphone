@@ -23,6 +23,14 @@ function portaLivre(tipo = 'tcp') {
   });
 }
 
+/** Linux: há PulseAudio (ou PipeWire com pipewire-pulse) na sessão? Senão usa-se o ALSA. */
+function temPulse() {
+  if (process.env.PULSE_SERVER) return true;
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
+  const base = process.env.XDG_RUNTIME_DIR || `/run/user/${uid}`;
+  return fs.existsSync(path.join(base, 'pulse', 'native'));
+}
+
 class Motor extends EventEmitter {
   /** @param {string} exe caminho do baresip; @param {string} pasta pasta de configuração */
   constructor(exe, pasta) {
@@ -40,6 +48,11 @@ class Motor extends EventEmitter {
 
   existe() { return fs.existsSync(this.exe); }
 
+  /** Últimas linhas do registo do motor. */
+  ultimoLog(n = 1200) {
+    try { const t = fs.readFileSync(this.ficheiroLog, 'utf8'); return t.slice(-n); } catch { return ''; }
+  }
+
   async iniciar() {
     if (this.proc) return;
     this.aParar = false;
@@ -47,7 +60,7 @@ class Motor extends EventEmitter {
     this.portaCtrl = await portaLivre('tcp');
     let portaSip = await portaLivre('udp');
     if (portaSip < 1024) portaSip = 5064;
-    const som = process.platform === 'win32' ? 'wasapi' : 'pulse';
+    const som = process.platform === 'win32' ? 'wasapi' : (temPulse() ? 'pulse' : 'alsa');
     fs.writeFileSync(path.join(this.pasta, 'config'), [
       `sip_listen 0.0.0.0:${portaSip}`,
       'sip_transports udp,tcp',
@@ -70,8 +83,14 @@ class Motor extends EventEmitter {
     // A conta é criada depois com "uanew": a palavra-passe nunca fica escrita no disco
     fs.writeFileSync(path.join(this.pasta, 'accounts'), '');
 
+    // Registo do motor (para diagnóstico): userData/sip/motor.log
+    this.ficheiroLog = path.join(this.pasta, 'motor.log');
+    fs.writeFileSync(this.ficheiroLog, `${new Date().toISOString()} ${this.exe} (som: ${som})\n`);
     this.proc = spawn(this.exe, ['-f', this.pasta], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    const registar = (d) => { this.emit('log', d.toString()); };
+    const registar = (d) => {
+      try { fs.appendFileSync(this.ficheiroLog, d); } catch { /* sem disco */ }
+      this.emit('log', d.toString());
+    };
     this.proc.stdout.on('data', registar);
     this.proc.stderr.on('data', registar);
     this.proc.on('exit', (codigo) => {
