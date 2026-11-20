@@ -69,8 +69,10 @@ jobs:
       - name: Compilar
         run: |
           P=/tmp/pfx
+          # Sem zlib (no Windows viria como zlib1.dll, que não existe nos computadores)
           cmake -S /tmp/re -B /tmp/re/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DLIBRE_BUILD_SHARED=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON -DCMAKE_INSTALL_PREFIX=$P
+            -DLIBRE_BUILD_SHARED=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_ZLIB=ON -DCMAKE_INSTALL_PREFIX=$P
           cmake --build /tmp/re/b && cmake --install /tmp/re/b
           cmake -S /tmp/baresip -B /tmp/baresip/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DSTATIC=ON -DCMAKE_PREFIX_PATH=$P -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
@@ -79,8 +81,9 @@ jobs:
           cmake --build /tmp/baresip/b
           mkdir -p out && cp /tmp/baresip/b/baresip.exe out/ && strip out/baresip.exe
           ls -la out
-          # Só deve depender de DLLs do Windows
-          objdump -p out/baresip.exe | grep -i "DLL Name" || true
+          # Só pode depender de DLLs do Windows
+          objdump -p out/baresip.exe | grep -i "DLL Name"
+          if objdump -p out/baresip.exe | grep -iE "DLL Name: (zlib|lib|msys)" ; then echo "::error::Depende de DLLs que não vêm com o Windows"; exit 1; fi
       - name: Testar
         shell: pwsh
         run: python desktop/motor/testar.py out/baresip.exe
