@@ -15,7 +15,7 @@
 // (baresip, em motor.js) e mostra um telefone simples (paginas/telefone.html):
 // chamadas UDP/TCP como o Zoiper, sem chat.
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell, ipcMain, net, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell, ipcMain, net, dialog, safeStorage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -224,11 +224,72 @@ function criarJanela() {
   carregar();
 }
 
+/* ------------------------- Aviso de versão nova ------------------------- */
+// Ao abrir e de 6 em 6 horas vê no GitHub se há uma versão mais recente (releases
+// "desktop-N"). Se houver, mostra uma notificação e um item na bandeja para a
+// descarregar. Não instala nada sozinha.
+
+let novaVersao = null; // { n, versao, url, pagina }
+let avisada = 0;
+
+function numeroVersao(v) { return parseInt(String(v).split('.').pop(), 10) || 0; }
+
+function ficheiroParaEstePC(assets) {
+  const meus = assets.filter((a) => a.name.startsWith(`${MARCA.nome}-`));
+  if (process.platform === 'win32') return meus.find((a) => a.name.endsWith('.exe'));
+  if (process.env.APPIMAGE) return meus.find((a) => a.name.endsWith('.AppImage'));
+  return meus.find((a) => a.name.endsWith('.deb'));
+}
+
+async function procurarAtualizacao(manual = false) {
+  const atual = numeroVersao(app.getVersion());
+  try {
+    const r = await net.fetch(`https://api.github.com/repos/${MARCA.repo}/releases?per_page=30`,
+      { headers: { Accept: 'application/vnd.github+json', 'User-Agent': MARCA.nome } });
+    if (!r.ok) throw new Error(`GitHub respondeu ${r.status}`);
+    const lista = await r.json();
+    let melhor = null;
+    for (const rel of lista) {
+      const m = /^desktop-(\d+)$/.exec(rel.tag_name || '');
+      if (!m || rel.draft || rel.prerelease) continue;
+      const n = parseInt(m[1], 10);
+      const f = ficheiroParaEstePC(rel.assets || []);
+      if (f && (!melhor || n > melhor.n)) melhor = { n, versao: `1.0.${n}`, url: f.browser_download_url, pagina: rel.html_url };
+    }
+    novaVersao = melhor && melhor.n > atual ? melhor : null;
+    bandeja?.setContextMenu(menuBandeja());
+    if (novaVersao && avisada !== novaVersao.n) {
+      avisada = novaVersao.n;
+      if (Notification.isSupported()) {
+        const n = new Notification({
+          title: `${MARCA.nome}: versão ${novaVersao.versao} disponível`,
+          body: `Tens a ${app.getVersion()}. Carrega aqui para descarregar a nova.`,
+          icon: path.join(__dirname, 'recursos', 'icone.png'),
+        });
+        n.on('click', () => shell.openExternal(novaVersao.url));
+        n.show();
+      }
+    }
+    if (manual) {
+      if (novaVersao) {
+        const { response } = await dialog.showMessageBox({ type: 'info', buttons: ['Descarregar', 'Agora não'], defaultId: 0,
+          message: `Há uma versão nova: ${novaVersao.versao}`, detail: `Tens a ${app.getVersion()}. Depois de descarregar, instala por cima (as contas ficam).` });
+        if (response === 0) shell.openExternal(novaVersao.url);
+      } else {
+        dialog.showMessageBox({ type: 'info', message: `O ${MARCA.nome} está atualizado`, detail: `Versão ${app.getVersion()}.` });
+      }
+    }
+  } catch (e) {
+    if (manual) dialog.showMessageBox({ type: 'warning', message: 'Não foi possível verificar se há versão nova', detail: String(e?.message || e) });
+  }
+}
+
 /* ------------------------- Bandeja do sistema ------------------------- */
 
 function menuBandeja() {
   return Menu.buildFromTemplate([
     { label: `Abrir ${MARCA.nome}`, click: mostrar },
+    ...(novaVersao ? [{ label: `⬇ Descarregar a versão ${novaVersao.versao}`, click: () => shell.openExternal(novaVersao.url) }] : []),
     { type: 'separator' },
     {
       label: 'Iniciar com o computador', type: 'checkbox', checked: arranqueAtivo(),
@@ -240,6 +301,7 @@ function menuBandeja() {
       const f = path.join(app.getPath('userData'), 'sip', 'motor.log');
       if (fs.existsSync(f)) shell.openPath(f); else dialog.showMessageBox({ message: 'Ainda não há registo do motor SIP.' });
     } },
+    { label: `Procurar atualizações (versão ${app.getVersion()})`, click: () => procurarAtualizacao(true) },
     { type: 'separator' },
     { label: 'Sair', click: () => { aSair = true; app.quit(); } },
   ]);
@@ -328,6 +390,10 @@ if (!app.requestSingleInstanceLock()) {
     if (TESTE && TESTE_SIP) return testarMotor();
     if (!TESTE) criarBandeja();
     criarJanela();
+    if (!TESTE && MARCA.repo && app.isPackaged) {
+      setTimeout(() => procurarAtualizacao(), 20000);
+      setInterval(() => procurarAtualizacao(), 6 * 3600 * 1000);
+    }
   });
 
   app.on('before-quit', () => { aSair = true; motor?.parar(); });

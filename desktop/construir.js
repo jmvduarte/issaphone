@@ -7,9 +7,9 @@ const builder = require('electron-builder');
 const marca = process.env.MARCA || 'issafone';
 const MARCAS = {
   // IssaFone: já vem ligado ao servidor do projeto
-  issafone: { nome: 'IssaFone', appId: 'pt.ipca.issafone.desktop', servidor: 'rsi-a36357.ddns.net', pasta: 'issafone' },
+  issafone: { nome: 'IssaFone', appId: 'pt.ipca.issafone.desktop', servidor: 'rsi-a36357.ddns.net', pasta: 'issafone', repo: 'jmvduarte/issaphone' },
   // IssaLink: pede o endereço do servidor na primeira vez
-  issalink: { nome: 'IssaLink', appId: 'pt.ipca.issalink.desktop', servidor: '', pasta: 'issalink' },
+  issalink: { nome: 'IssaLink', appId: 'pt.ipca.issalink.desktop', servidor: '', pasta: 'issalink', repo: 'jmvduarte/issalink' },
 };
 const M = MARCAS[marca];
 if (!M) throw new Error(`Marca desconhecida: ${marca}`);
