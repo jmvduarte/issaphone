@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Dependências
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build libpulse-dev libasound2-dev
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build libpulse-dev libasound2-dev libssl-dev
       - name: Código do re e do baresip
         run: |
           git clone -q --depth 1 -b "$VERSAO_BARESIP" https://github.com/baresip/re /tmp/re
@@ -32,11 +32,12 @@ jobs:
       - name: Compilar
         run: |
           P=/tmp/pfx
+          # No Linux o libre usa o OpenSSL para a autenticação (HMAC); fica ligado de forma estática
           cmake -S /tmp/re -B /tmp/re/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DLIBRE_BUILD_SHARED=OFF -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON -DCMAKE_INSTALL_PREFIX=$P
+            -DLIBRE_BUILD_SHARED=OFF -DOPENSSL_USE_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=$P
           cmake --build /tmp/re/b && cmake --install /tmp/re/b
           cmake -S /tmp/baresip -B /tmp/baresip/b -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DSTATIC=ON -DCMAKE_PREFIX_PATH=$P -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+            -DSTATIC=ON -DCMAKE_PREFIX_PATH=$P -DOPENSSL_USE_STATIC_LIBS=ON \
             -DMODULES="$MODULOS_COMUNS;pulse;alsa"
           cmake --build /tmp/baresip/b
           mkdir -p out && cp /tmp/baresip/b/baresip out/ && strip out/baresip
