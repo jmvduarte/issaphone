@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('issaDesktop', {
   aoEvento: (fn) => ipcRenderer.on('motor-evento', (_e, ev) => fn(ev)),
   estadoMotor: () => ipcRenderer.invoke('motor-estado'),
   registoMotor: () => ipcRenderer.invoke('motor-log'),
+  /** Janela do telefone (sem moldura): 'minimizar' | 'fechar' | 'registo'. */
+  janela: (acao) => ipcRenderer.send('janela', String(acao)),
   plataforma: process.platform,
 });

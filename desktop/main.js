@@ -96,6 +96,7 @@ async function abrirTelefone() {
   } catch (e) {
     return paginaLocal('erro', { motivo: String(e.message || e) });
   }
+  trocarJanela('telefone');
   janela.loadFile(path.join(__dirname, 'paginas', 'telefone.html'), {
     query: { nome: MARCA.nome, extensao: c.sip.extensao },
   });
@@ -150,6 +151,7 @@ async function urlWebapp(s) {
 
 function paginaLocal(modo, extra = {}) {
   const sip = lerConf().sip || {};
+  trocarJanela('normal');
   janela.loadFile(path.join(__dirname, 'paginas', 'inicio.html'), {
     query: { modo, nome: MARCA.nome, servidor: servidor(), extensao: sip.extensao || '',
       transporte: sip.transporte || 'udp', servidorSip: sip.servidor || '', ...extra },
@@ -162,17 +164,37 @@ async function carregar() {
   if (!s) return paginaLocal('configurar');
   const url = await urlWebapp(s);
   if (!url) return paginaLocal('erro', { motivo: `Não foi possível abrir a webapp em https://${s}/` });
+  trocarJanela('normal');
   janela.loadURL(url);
 }
 
-function criarJanela() {
+// Duas formas de janela: "normal" (webapp e configuração) e "telefone" (modo só chamadas:
+// sem moldura, transparente à volta, com a forma de um telemóvel desenhada na página).
+let estiloJanela = null;
+const ESTILOS = {
+  normal: { width: 1100, height: 760, minWidth: 360, minHeight: 560, backgroundColor: '#0d1117' },
+  telefone: { width: 324, height: 648, resizable: false, maximizable: false, fullscreenable: false,
+    frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false },
+};
+
+/** Troca a janela pela do outro estilo (a moldura não se muda numa janela já aberta). */
+function trocarJanela(estilo) {
+  if (!janela || estiloJanela === estilo) return;
+  const velha = janela;
+  criarJanela(estilo, { carregar: false, mostrar: velha.isVisible() });
+  velha.removeAllListeners('close');
+  velha.destroy();
+}
+
+function criarJanela(estilo = lerConf().modo === 'sip' ? 'telefone' : 'normal',
+  { carregar: carregarJa = true, mostrar: visivel = !ESCONDIDO && !TESTE } = {}) {
+  estiloJanela = estilo;
   janela = new BrowserWindow({
-    width: 1100, height: 760, minWidth: 360, minHeight: 560,
+    ...ESTILOS[estilo],
     title: MARCA.nome,
     icon: path.join(__dirname, 'recursos', 'icone.png'),
     autoHideMenuBar: true,
-    show: !ESCONDIDO && !TESTE,
-    backgroundColor: '#0d1117',
+    show: visivel,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -221,7 +243,7 @@ function criarJanela() {
     }
   });
 
-  carregar();
+  if (carregarJa) carregar();
 }
 
 /* ------------------------- Aviso de versão nova ------------------------- */
@@ -297,10 +319,7 @@ function menuBandeja() {
     },
     { label: 'Mudar de servidor…', click: () => { mostrar(); paginaLocal('configurar'); } },
     { label: 'Recarregar', click: () => { mostrar(); carregar(); } },
-    { label: 'Ver registo do motor SIP', click: () => {
-      const f = path.join(app.getPath('userData'), 'sip', 'motor.log');
-      if (fs.existsSync(f)) shell.openPath(f); else dialog.showMessageBox({ message: 'Ainda não há registo do motor SIP.' });
-    } },
+    { label: 'Ver registo do motor SIP', click: abrirRegistoMotor },
     { label: `Procurar atualizações (versão ${app.getVersion()})`, click: () => procurarAtualizacao(true) },
     { type: 'separator' },
     { label: 'Sair', click: () => { aSair = true; app.quit(); } },
@@ -336,6 +355,17 @@ ipcMain.handle('definir-servidor', async (_e, s) => {
   return { ok: true };
 });
 ipcMain.handle('tentar-de-novo', () => carregar());
+
+// Botões da janela do telefone (não tem moldura do sistema)
+ipcMain.on('janela', (_e, acao) => {
+  if (acao === 'minimizar') janela?.minimize();
+  else if (acao === 'fechar') janela?.close(); // só esconde: continua na bandeja
+  else if (acao === 'registo') abrirRegistoMotor();
+});
+function abrirRegistoMotor() {
+  const f = path.join(app.getPath('userData'), 'sip', 'motor.log');
+  if (fs.existsSync(f)) shell.openPath(f); else dialog.showMessageBox({ message: 'Ainda não há registo do motor SIP.' });
+}
 
 // Modo "Issabel normal": guardar a conta, arrancar o motor e abrir o telefone
 ipcMain.handle('entrar-sip', async (_e, d) => {

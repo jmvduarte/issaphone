@@ -7,6 +7,23 @@ const NOME_APP = q.get('nome') || 'IssaLink';
 const EXT = q.get('extensao') || '';
 document.title = NOME_APP;
 $('titulo').textContent = NOME_APP;
+$('marcaNome').textContent = NOME_APP;
+$('ext').textContent = EXT ? `Ext. ${EXT}` : '';
+
+/* ------------------------- Janela (sem moldura) ------------------------- */
+$('minimizar').addEventListener('click', () => D.janela('minimizar'));
+$('fechar').addEventListener('click', () => D.janela('fechar'));
+$('registo').addEventListener('click', () => D.janela('registo'));
+const relogioLcd = () => { $('hora').textContent = new Date().toLocaleTimeString('pt-PT'); };
+relogioLcd(); setInterval(relogioLcd, 1000);
+
+/* ------------------------- Vistas: teclado / recentes ------------------------- */
+function verRecentes(sim) { $('vistaRecentes').hidden = !sim; if (!sim) $('numero').focus(); }
+$('abrirRecentes').addEventListener('click', () => verRecentes(true));
+$('rodRecentes').addEventListener('click', () => verRecentes($('vistaRecentes').hidden));
+$('fecharRecentes').addEventListener('click', () => verRecentes(false));
+$('rodTeclado').addEventListener('click', () => verRecentes(false));
+$('home').addEventListener('click', () => { verRecentes(false); $('numero').value = ''; });
 
 /* ------------------------- Estado do registo ------------------------- */
 function estado(texto, tipo = '') {
@@ -29,7 +46,7 @@ for (const [t, l] of TECLAS) {
   d.addEventListener('click', () => D.motor('sndcode', t));
   $('dtmf').append(d);
 }
-$('apagar').addEventListener('click', () => { $('numero').value = $('numero').value.slice(0, -1); });
+$('apagar').addEventListener('click', () => { $('numero').value = $('numero').value.slice(0, -1); $('numero').focus(); });
 $('numero').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') ligar();
   if (e.key === 'Escape') $('numero').value = '';
@@ -61,7 +78,7 @@ function mostrarRecentes() {
     el.querySelector('.avatar').textContent = iniciais(r.nome || r.numero);
     el.querySelector('b').textContent = r.nome && r.nome !== r.numero ? `${r.nome} (${r.numero})` : r.numero;
     el.title = 'Ligar';
-    el.addEventListener('click', () => { $('numero').value = r.numero; ligar(); });
+    el.addEventListener('click', () => { $('numero').value = r.numero; verRecentes(false); ligar(); });
     caixa.append(el);
   }
 }

@@ -6,102 +6,163 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'">
 <title>Telefone</title>
 <style>
-  :root { --fundo:#0d1117; --cartao:#161b22; --linha:#30363d; --texto:#e6edf3; --suave:#9aa4b2;
-          --verde:#22c55e; --vermelho:#ef4444; --azul:#2F5BFF; --ciano:#14C8B4; }
+  /* Telefone do modo "só chamadas" na app de computador: janela sem moldura com a forma
+     de um telemóvel (cores do IssaFone/IssaLink). A janela é transparente à volta. */
+  :root { --azul:#2F5BFF; --ciano:#14C8B4; --verde:#22c55e; --vermelho:#ef4444; --texto:#e6edf3; --suave:#93a4bf;
+          --lcd:#7fe9ff; }
   * { box-sizing:border-box; }
-  html, body { height:100%; }
-  body { margin:0; background:var(--fundo); color:var(--texto); font:15px/1.4 system-ui, "Segoe UI", Ubuntu, sans-serif;
-         display:flex; flex-direction:column; user-select:none; }
-  header { background:linear-gradient(135deg,var(--azul),var(--ciano)); padding:14px 18px 18px; border-radius:0 0 24px 24px; }
-  .topo { display:flex; align-items:center; gap:12px; }
-  .topo img { width:40px; height:40px; border-radius:12px; }
-  .topo h1 { margin:0; font-size:20px; flex:1; color:#fff; }
-  .pilula { display:inline-flex; align-items:center; gap:7px; margin-top:10px; padding:6px 12px; border-radius:999px;
-            background:rgba(0,0,0,.22); color:#fff; font-size:13px; max-width:100%; }
-  .pilula i { width:9px; height:9px; border-radius:50%; background:#facc15; flex:none; }
-  .pilula.ok i { background:var(--verde); } .pilula.erro i { background:var(--vermelho); }
-  .pilula span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  html, body { height:100%; margin:0; background:transparent; overflow:hidden; }
+  body { display:grid; place-items:center; color:var(--texto); font:14px/1.35 system-ui, "Segoe UI", Ubuntu, sans-serif; user-select:none; }
   button { font:inherit; color:inherit; cursor:pointer; border:0; background:none; }
-  .ligeiro { color:#fff; opacity:.9; padding:6px 10px; border-radius:10px; }
-  .ligeiro:hover { background:rgba(0,0,0,.18); }
-  main { flex:1; display:flex; gap:22px; padding:22px; min-height:0; }
-  .teclado { width:min(340px,100%); margin:0 auto; display:flex; flex-direction:column; align-items:center; gap:14px; }
-  #numero { width:100%; text-align:center; font-size:30px; letter-spacing:1px; background:none; border:0; color:var(--texto);
-            border-bottom:1px solid var(--linha); padding:8px 4px; outline:none; user-select:text; }
-  .grelha { display:grid; grid-template-columns:repeat(3, 76px); gap:14px; }
-  .tecla { width:76px; height:76px; border-radius:50%; background:var(--cartao); font-size:26px; display:flex; flex-direction:column;
-           align-items:center; justify-content:center; transition:background .15s; }
-  .tecla small { font-size:10px; color:var(--suave); letter-spacing:2px; height:12px; }
-  .tecla:hover { background:#1f2630; } .tecla:active { background:#2a3340; }
-  .acoes { display:flex; align-items:center; gap:26px; margin-top:4px; }
-  .redondo { width:70px; height:70px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-  .verde { background:var(--verde); } .vermelho { background:var(--vermelho); }
-  .redondo svg { width:30px; height:30px; fill:#fff; }
-  #apagar { color:var(--suave); font-size:22px; width:48px; height:48px; border-radius:50%; }
-  #apagar:hover { background:var(--cartao); }
-  aside { width:300px; background:var(--cartao); border-radius:20px; padding:14px; overflow:auto; }
-  aside h2 { margin:4px 6px 10px; font-size:16px; }
-  .recente { display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:12px; cursor:pointer; }
-  .recente:hover { background:#1f2630; }
-  .avatar { width:38px; height:38px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
-            font-weight:700; color:#fff; background:linear-gradient(135deg,var(--azul),var(--ciano)); }
-  .recente .info { flex:1; min-width:0; } .recente .info b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .recente .info span { color:var(--suave); font-size:12px; }
-  .seta { font-size:14px; } .perdida { color:var(--vermelho); }
-  .vazio { color:var(--suave); text-align:center; margin-top:30px; }
-  @media (max-width:760px) { aside { display:none; } }
-  /* Ecrã de chamada (feita, recebida, em curso) */
-  #chamada { position:fixed; inset:0; background:radial-gradient(circle at 50% 20%, #1d2b55, var(--fundo) 65%);
-             display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
-  #chamada[hidden] { display:none; }
-  #chamada .avatar { width:110px; height:110px; font-size:40px; margin-bottom:8px; }
-  #chamada h2 { margin:0; font-size:28px; } #chamada .num { color:var(--suave); }
-  #estadoChamada { color:#cbd5e1; min-height:1.4em; }
-  .botoes { display:flex; flex-wrap:wrap; justify-content:center; gap:18px; margin:26px 0 10px; max-width:420px; }
-  .opcao { display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; color:#cbd5e1; }
-  .opcao .redondo { width:60px; height:60px; background:rgba(255,255,255,.1); }
+  [hidden] { display:none !important; }
+
+  /* Corpo do telemóvel */
+  .telemovel { position:relative; width:300px; height:624px; border-radius:46px; padding:12px 14px 14px;
+               background:linear-gradient(160deg,#4a5260 0%,#1d222b 22%,#0e1117 70%,#2a303a 100%);
+               box-shadow:0 0 0 1.5px #5d6675, inset 0 0 0 2px #0a0c10, inset 0 2px 1px rgba(255,255,255,.25),
+                          0 10px 28px rgba(0,0,0,.55); display:flex; flex-direction:column; }
+  /* Botões laterais (decoração) */
+  .lado { position:absolute; width:4px; border-radius:3px; background:linear-gradient(90deg,#69717f,#2b3039); }
+  .lado.e1 { left:-4px; top:120px; height:40px; } .lado.e2 { left:-4px; top:170px; height:40px; }
+  .lado.d1 { right:-4px; top:140px; height:62px; }
+
+  /* Barra de cima: arrastar a janela, minimizar e fechar */
+  .barra { -webkit-app-region:drag; height:30px; display:flex; align-items:center; gap:8px; padding:0 10px 0 16px; }
+  .barra .altifalante { width:46px; height:5px; border-radius:3px; background:#05070a; box-shadow:inset 0 1px 2px #000, 0 1px 0 rgba(255,255,255,.12); margin:0 auto; }
+  .barra h1 { position:absolute; left:28px; top:13px; margin:0; font-size:12px; font-weight:700; letter-spacing:.5px;
+              background:linear-gradient(90deg,#8fb0ff,var(--ciano)); -webkit-background-clip:text; color:transparent; }
+  .barra .janela { -webkit-app-region:no-drag; position:absolute; right:26px; top:9px; display:flex; gap:5px; }
+  .barra .janela button { width:20px; height:20px; border-radius:6px; background:#232833; color:#c8d2e2; font-size:13px; line-height:20px;
+                          box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
+  .barra .janela button:hover { background:#323947; } .barra .janela #fechar:hover { background:var(--vermelho); color:#fff; }
+
+  /* Zona que muda: ecrã + teclado, ou o ecrã da chamada, ou os recentes */
+  .area { position:relative; flex:1; display:flex; flex-direction:column; min-height:0; }
+
+  /* Ecrã LCD */
+  .ecra { position:relative; margin-top:4px; height:186px; border-radius:16px; padding:9px 12px; overflow:hidden;
+          background:radial-gradient(120% 90% at 50% 0%,#14306a 0%,#0a1630 45%,#050a14 100%);
+          box-shadow:inset 0 0 0 1px rgba(127,233,255,.16), inset 0 6px 18px rgba(0,0,0,.6); }
+  .ecra::after { content:""; position:absolute; inset:0; pointer-events:none;
+                  background:linear-gradient(155deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 38%); }
+  .lcdTopo { display:flex; justify-content:space-between; font-size:12px; color:var(--lcd); font-variant-numeric:tabular-nums; opacity:.95; }
+  .marca { display:flex; align-items:center; justify-content:center; gap:9px; margin:10px 0 8px; }
+  .marca img { width:38px; height:38px; border-radius:11px; box-shadow:0 0 14px rgba(20,200,180,.35); }
+  .marca span { font-size:25px; font-weight:800; letter-spacing:.5px;
+                background:linear-gradient(90deg,#6f93ff,var(--ciano)); -webkit-background-clip:text; color:transparent; }
+  .pilula { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#cfe9ff; }
+  .pilula i { width:8px; height:8px; border-radius:50%; background:#facc15; flex:none; box-shadow:0 0 6px currentColor; color:#facc15; }
+  .pilula.ok i { background:var(--verde); color:var(--verde); } .pilula.erro i { background:var(--vermelho); color:var(--vermelho); }
+  .pilula span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #numero { width:100%; margin-top:8px; text-align:right; font-size:26px; letter-spacing:1px; background:none; border:0;
+            border-top:1px dashed rgba(127,233,255,.22); color:#fff; padding:6px 2px 0; outline:none; user-select:text;
+            font-variant-numeric:tabular-nums; text-shadow:0 0 10px rgba(127,233,255,.35); }
+  #numero::placeholder { color:rgba(207,233,255,.35); font-size:15px; letter-spacing:0; }
+
+  /* Teclado */
+  .grelha { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-top:12px; }
+  .tecla { height:46px; border-radius:11px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+           font-size:21px; font-weight:600; color:#f3f6fb;
+           background:linear-gradient(180deg,#2c323d 0%,#1a1e26 52%,#13161c 100%);
+           box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 1px 2px rgba(0,0,0,.6); transition:filter .1s, transform .05s; }
+  .tecla small { font-size:8.5px; letter-spacing:1.5px; color:#8fb0ff; height:10px; line-height:10px; font-weight:600; }
+  .tecla:hover { filter:brightness(1.25); } .tecla:active { transform:translateY(1px); filter:brightness(.9); }
+  .tecla.destaque { background:linear-gradient(180deg,#3f6bff 0%,#2449d6 55%,#1b39ad 100%); }
+  .tecla.destaque small { color:#cfe0ff; }
+
+  /* Linha de ações: recentes · ligar · apagar */
+  .acoes { display:grid; grid-template-columns:1fr 1.3fr 1fr; gap:7px; margin-top:7px; }
+  .acoes button { height:46px; border-radius:11px; font-size:13px; font-weight:600; color:#dbe4f3;
+                  background:linear-gradient(180deg,#2c323d,#13161c); box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 1px 2px rgba(0,0,0,.6); }
+  .acoes button:hover { filter:brightness(1.25); }
+  .acoes #ligar { background:linear-gradient(180deg,#34d571 0%,#18a34a 60%,#128a3d 100%); display:flex; align-items:center; justify-content:center; }
+  .acoes #ligar svg { width:24px; height:24px; fill:#fff; }
+
+  /* Barra de baixo + botão "home" */
+  .rodape { display:flex; justify-content:space-around; align-items:center; margin-top:10px; padding:0 4px; }
+  .rodape button { width:38px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#9fb0c9; }
+  .rodape button:hover { background:#1d222b; color:#fff; }
+  .rodape svg { width:20px; height:20px; fill:currentColor; }
+  .home { width:46px !important; height:46px !important; border-radius:50% !important; margin:0 6px;
+          background:radial-gradient(circle at 50% 35%,#2a303a,#0b0d12) !important; box-shadow:0 0 0 2px #3c4350, inset 0 1px 0 rgba(255,255,255,.15); }
+  .home i { width:16px; height:16px; border-radius:5px; border:2px solid #7d8899; }
+
+  /* Recentes (cobre o ecrã e o teclado) */
+  #vistaRecentes { position:absolute; inset:4px 0 0; border-radius:16px; background:linear-gradient(180deg,#0b1630,#060a14);
+                   box-shadow:inset 0 0 0 1px rgba(127,233,255,.16); display:flex; flex-direction:column; padding:10px; }
+  #vistaRecentes header { display:flex; align-items:center; gap:8px; color:var(--lcd); font-weight:700; margin-bottom:6px; }
+  #vistaRecentes header button { color:var(--lcd); font-size:18px; padding:0 6px; }
+  #recentes { flex:1; overflow:auto; }
+  .recente { display:flex; align-items:center; gap:9px; padding:7px 6px; border-radius:10px; cursor:pointer; }
+  .recente:hover { background:rgba(127,233,255,.08); }
+  .avatar { width:34px; height:34px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+            font-weight:700; color:#fff; font-size:13px; background:linear-gradient(135deg,var(--azul),var(--ciano)); }
+  .recente .info { flex:1; min-width:0; } .recente .info b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+  .recente .info span { color:var(--suave); font-size:11px; }
+  .seta { font-size:12px; } .perdida { color:var(--vermelho); }
+  .vazio { color:var(--suave); text-align:center; margin-top:40px; }
+
+  /* Ecrã da chamada (cobre o ecrã e o teclado) */
+  #chamada { position:absolute; inset:4px 0 0; border-radius:16px; overflow:hidden;
+             background:radial-gradient(120% 70% at 50% 0%,#1d3a8a 0%,#0a1630 50%,#050a14 100%);
+             box-shadow:inset 0 0 0 1px rgba(127,233,255,.16);
+             display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:12px; }
+  #chamada .avatar { width:84px; height:84px; font-size:30px; margin-bottom:6px; box-shadow:0 0 0 6px rgba(127,233,255,.08), 0 0 30px rgba(20,200,180,.3); }
+  #chamada h2 { margin:0; font-size:22px; text-align:center; } #chamada .num { color:var(--suave); }
+  #estadoChamada { color:var(--lcd); min-height:1.4em; font-variant-numeric:tabular-nums; }
+  .redondo { width:62px; height:62px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .redondo svg { width:28px; height:28px; fill:#fff; }
+  .verde { background:linear-gradient(180deg,#34d571,#128a3d); } .vermelho { background:linear-gradient(180deg,#f87171,#c81e1e); }
+  .botoes { display:grid; grid-template-columns:repeat(4,56px); gap:8px; margin:18px 0 6px; }
+  .opcao { display:flex; flex-direction:column; align-items:center; gap:5px; font-size:10.5px; color:#cbd5e1; }
+  .opcao .redondo { width:48px; height:48px; background:rgba(255,255,255,.1); }
   .opcao.ativo .redondo { background:#fff; } .opcao.ativo svg { fill:#0d1117; }
-  .opcao svg { width:26px; height:26px; fill:#fff; }
-  #dtmf { display:grid; grid-template-columns:repeat(3,58px); gap:10px; margin-top:6px; }
-  #dtmf[hidden] { display:none; }
-  #dtmf button { height:52px; border-radius:14px; background:rgba(255,255,255,.1); font-size:20px; }
-  .linhaAcoes { display:flex; gap:40px; margin-top:12px; }
-  dialog { background:var(--cartao); color:var(--texto); border:1px solid var(--linha); border-radius:18px; padding:20px; width:320px; }
+  .opcao svg { width:22px; height:22px; fill:#fff; }
+  #dtmf { display:grid; grid-template-columns:repeat(3,54px); gap:7px; margin-top:4px; }
+  #dtmf button { height:36px; border-radius:10px; background:rgba(255,255,255,.1); font-size:17px; }
+  .linhaAcoes { display:flex; gap:44px; margin-top:16px; }
+
+  dialog { background:#161b22; color:var(--texto); border:1px solid #30363d; border-radius:16px; padding:16px; width:250px; }
   dialog::backdrop { background:rgba(0,0,0,.5); }
-  dialog input { width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--linha); background:var(--fundo); color:var(--texto); font-size:16px; margin:10px 0 14px; }
-  dialog .fim { display:flex; justify-content:flex-end; gap:10px; }
-  dialog .fim button { padding:9px 16px; border-radius:10px; } dialog .fim .principal { background:var(--azul); color:#fff; }
+  dialog input { width:100%; padding:10px; border-radius:10px; border:1px solid #30363d; background:#0d1117; color:var(--texto); font-size:15px; margin:10px 0 12px; }
+  dialog .fim { display:flex; justify-content:flex-end; gap:8px; }
+  dialog .fim button { padding:8px 14px; border-radius:9px; } dialog .fim .principal { background:var(--azul); color:#fff; }
 </style>
 </head>
 <body>
-<header>
-  <div class="topo">
-    <img src="../recursos/icone.png" alt="">
-    <h1 id="titulo">IssaLink</h1>
-    <button class="ligeiro" id="sair" title="Terminar sessão">Sair</button>
-  </div>
-  <div class="pilula" id="estado"><i></i><span>A ligar…</span></div>
-</header>
+<div class="telemovel">
+  <span class="lado e1"></span><span class="lado e2"></span><span class="lado d1"></span>
 
-<main>
-  <section class="teclado">
-    <input id="numero" placeholder="Número ou extensão" autocomplete="off" spellcheck="false" autofocus>
+  <div class="barra">
+    <h1 id="titulo">IssaLink</h1>
+    <span class="altifalante"></span>
+    <div class="janela">
+      <button id="minimizar" title="Minimizar">–</button>
+      <button id="fechar" title="Fechar (continua na bandeja a receber chamadas)">×</button>
+    </div>
+  </div>
+
+  <div class="area">
+    <div class="ecra">
+      <div class="lcdTopo"><span id="hora">--:--</span><span id="ext"></span></div>
+      <div class="marca"><img src="../recursos/icone.png" alt=""><span id="marcaNome">IssaLink</span></div>
+      <div class="pilula" id="estado"><i></i><span>A ligar…</span></div>
+      <input id="numero" placeholder="Número ou extensão" autocomplete="off" spellcheck="false" autofocus>
+    </div>
+
     <div class="grelha" id="grelha"></div>
     <div class="acoes">
-      <span style="width:48px"></span>
-      <button class="redondo verde" id="ligar" title="Ligar (Enter)">
-        <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg>
-      </button>
-      <button id="apagar" title="Apagar">⌫</button>
+      <button id="abrirRecentes" title="Chamadas recentes">Recentes</button>
+      <button id="ligar" title="Ligar (Enter)"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg></button>
+      <button id="apagar" title="Apagar (Backspace)">⌫</button>
     </div>
-  </section>
-  <aside>
-    <h2>Recentes</h2>
-    <div id="recentes"></div>
-  </aside>
-</main>
 
-<div id="chamada" hidden>
+    <div id="vistaRecentes" hidden>
+      <header><button id="fecharRecentes" title="Voltar">‹</button>Recentes</header>
+      <div id="recentes"></div>
+    </div>
+
+    <div id="chamada" hidden>
   <div class="avatar" id="cAvatar">?</div>
   <h2 id="cNome"></h2>
   <div class="num" id="cNumero"></div>
@@ -132,6 +193,16 @@
     <button class="redondo vermelho" id="desligar" title="Desligar">
       <svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.1.3-4.6.7v3.1c0 .4-.2.7-.6.9-1 .5-1.9 1.1-2.7 1.8-.2.2-.4.3-.7.3s-.5-.1-.7-.3L.3 13.1A1 1 0 0 1 0 12.4c0-.3.1-.5.3-.7A17 17 0 0 1 12 7c4.5 0 8.6 1.7 11.7 4.7.2.2.3.4.3.7s-.1.5-.3.7l-2.5 2.4c-.2.2-.4.3-.7.3s-.5-.1-.7-.3a11 11 0 0 0-2.7-1.8.9.9 0 0 1-.6-.9V9.7C15.1 9.3 13.6 9 12 9z"/></svg>
     </button>
+  </div>
+</div>
+  </div>
+
+  <div class="rodape">
+    <button id="rodRecentes" title="Chamadas recentes"><svg viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.9 3.9L9 12H6a7 7 0 1 1 2.1 5l-1.4 1.4A9 9 0 1 0 13 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8H12z"/></svg></button>
+    <button id="rodTeclado" title="Teclado"><svg viewBox="0 0 24 24"><path d="M12 19a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 1a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm12-8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm-6 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg></button>
+    <button class="home" id="home" title="Início"><i></i></button>
+    <button id="registo" title="Ver registo do motor SIP"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></button>
+    <button id="sair" title="Terminar sessão"><svg viewBox="0 0 24 24"><path d="M10 17l1.4 1.4L17.8 12l-6.4-6.4L10 7l4 4H3v2h11l-4 4zM19 3h-8v2h8v14h-8v2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg></button>
   </div>
 </div>
 
