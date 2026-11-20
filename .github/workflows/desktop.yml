@@ -72,6 +72,8 @@ jobs:
       - name: Testar o motor SIP incluído (Linux)
         if: runner.os == 'Linux'
         run: |
+          # Como num computador com ambiente gráfico (a máquina do GitHub não traz a biblioteca do PulseAudio)
+          sudo apt-get install -y -qq libpulse0 >/dev/null
           xvfb-run -a timeout 60 ./dist/${{ matrix.marca }}/linux-unpacked/${{ matrix.marca }} \
             --no-sandbox --teste-sip --teste=$PWD/motor.txt || true
           cat motor.txt 2>/dev/null || echo "sem resultado"
