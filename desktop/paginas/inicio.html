@@ -26,6 +26,10 @@
            background:linear-gradient(135deg,#2F5BFF,#14C8B4); color:#fff; font-size:16px; font-weight:600; }
   button.secundario { background:transparent; color:var(--texto); border:1px solid #30363d; }
   .erro { color:var(--erro); margin-top:12px; min-height:1.4em; }
+  label { display:block; font-size:13px; color:var(--suave); margin:12px 0 6px; }
+  select { width:100%; padding:12px 14px; border-radius:14px; border:1px solid #30363d; background:#0d1117; color:var(--texto); font-size:15px; }
+  .ligacao { display:block; margin-top:14px; color:#7cc4ff; text-align:center; cursor:pointer; font-size:14px; background:none; border:0; width:auto; padding:0; }
+  .ligacao:hover { text-decoration:underline; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -42,6 +46,23 @@
     <input id="servidor" placeholder="ex.: pbx.empresa.pt" autocomplete="off" spellcheck="false" autofocus>
     <button type="submit" id="continuar">Continuar</button>
     <div class="erro" id="msg"></div>
+    <button type="button" class="ligacao" id="irSip">Issabel sem o script? Entrar só com chamadas</button>
+  </form>
+
+  <form class="cartao" id="sip" hidden>
+    <h2>Só chamadas</h2>
+    <p>Funciona em qualquer Issabel, sem preparar o servidor (como o Zoiper). Chat e videochamadas precisam do servidor preparado.</p>
+    <label for="sServidor">Servidor (domínio ou IP; porta própria como servidor:porta)</label>
+    <input id="sServidor" placeholder="ex.: 192.168.1.10" autocomplete="off" spellcheck="false">
+    <label for="sExtensao">Extensão</label>
+    <input id="sExtensao" inputmode="numeric" autocomplete="off">
+    <label for="sPasse">Palavra-passe (secret da extensão)</label>
+    <input id="sPasse" type="password" autocomplete="off">
+    <label for="sTransporte">Ligação</label>
+    <select id="sTransporte"><option value="udp">UDP (normal)</option><option value="tcp">TCP</option></select>
+    <button type="submit" id="entrarSip">Entrar</button>
+    <div class="erro" id="msgSip"></div>
+    <button type="button" class="ligacao" id="irWeb">Tenho o servidor preparado com o script</button>
   </form>
 
   <div class="cartao" id="erro" hidden>
@@ -50,6 +71,7 @@
     <p>Confirma a ligação à Internet e se o servidor está ligado.</p>
     <button id="denovo">Tentar outra vez</button>
     <button class="secundario" id="mudar">Mudar de servidor</button>
+    <button type="button" class="ligacao" id="irSip2">Entrar só com chamadas (Issabel sem o script)</button>
   </div>
 </main>
 <script>
@@ -58,11 +80,34 @@
   document.title = nome;
   document.getElementById('nome').textContent = nome;
   document.querySelectorAll('.nome').forEach((e) => { e.textContent = nome; });
+  const $ = (id) => document.getElementById(id);
   const mostrar = (modo) => {
-    document.getElementById('configurar').hidden = modo !== 'configurar';
-    document.getElementById('erro').hidden = modo !== 'erro';
+    $('configurar').hidden = modo !== 'configurar';
+    $('erro').hidden = modo !== 'erro';
+    $('sip').hidden = modo !== 'sip';
   };
-  mostrar(q.get('modo'));
+  mostrar(q.get('sip') ? 'sip' : q.get('modo'));
+  $('sServidor').value = q.get('servidorSip') || q.get('servidor') || '';
+  $('sExtensao').value = q.get('extensao') || '';
+  $('sTransporte').value = q.get('transporte') || 'udp';
+  const irSip = () => {
+    if (!$('sServidor').value) $('sServidor').value = $('servidor').value;
+    mostrar('sip');
+    ($('sExtensao').value ? $('sPasse') : $('sExtensao')).focus();
+  };
+  $('irSip').addEventListener('click', irSip);
+  $('irSip2').addEventListener('click', irSip);
+  $('irWeb').addEventListener('click', () => mostrar('configurar'));
+  $('sip').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const b = $('entrarSip');
+    b.disabled = true; b.textContent = 'A entrar…'; $('msgSip').textContent = '';
+    const r = await window.issaDesktop.entrarSip({
+      servidor: $('sServidor').value, extensao: $('sExtensao').value,
+      palavraPasse: $('sPasse').value, transporte: $('sTransporte').value,
+    });
+    if (!r.ok) { $('msgSip').textContent = r.erro; b.disabled = false; b.textContent = 'Entrar'; }
+  });
   document.getElementById('servidor').value = q.get('servidor') || '';
   document.getElementById('motivo').textContent = q.get('motivo') || '';
 

@@ -34,11 +34,13 @@ builder.build({
       homepage: 'https://github.com/jmvduarte/issaphone',
       author: { name: 'Jorge Duarte', email: 'issafone@users.noreply.github.com' },
     },
-    files: ['main.js', 'preload.js', 'marca.json', 'paginas/**', 'recursos/**'],
+    files: ['main.js', 'preload.js', 'motor.js', 'marca.json', 'paginas/**', 'recursos/**'],
     directories: { output: `dist/${marca}` },
     win: {
       target: [{ target: 'nsis', arch: ['x64'] }],
       icon: 'recursos/icone.png',
+      // Motor SIP do modo "Issabel normal" (baresip, BSD-3-Clause)
+      extraResources: [{ from: 'motor/bin/win', to: 'motor' }, { from: 'motor/LICENCAS.txt', to: 'motor/LICENCAS.txt' }],
     },
     nsis: {
       oneClick: false,
@@ -56,8 +58,14 @@ builder.build({
       executableName: marca,
       synopsis: 'Chamadas e chat para Issabel',
       maintainer: 'Jorge Duarte <issafone@users.noreply.github.com>',
+      extraResources: [{ from: 'motor/bin/linux', to: 'motor' }, { from: 'motor/LICENCAS.txt', to: 'motor/LICENCAS.txt' }],
     },
-    deb: { packageName: marca },
+    deb: {
+      packageName: marca,
+      // Dependências do Electron + o som do motor SIP (PulseAudio/PipeWire e ALSA)
+      depends: ['libgtk-3-0', 'libnotify4', 'libnss3', 'libxss1', 'libxtst6', 'xdg-utils', 'libatspi2.0-0',
+        'libuuid1', 'libsecret-1-0', 'libpulse0', 'libasound2 | libasound2t64'],
+    },
   },
 }).then((ficheiros) => console.log('Gerado:\n' + ficheiros.join('\n')))
   .catch((e) => { console.error(e); process.exit(1); });

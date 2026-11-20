@@ -10,15 +10,21 @@
 //   - arranca com o computador (pode desligar-se no menu da bandeja);
 //   - quando chega uma chamada, a janela vem para a frente;
 //   - microfone, câmara e notificações autorizados sem perguntar.
+//
+// Modo "Issabel normal" (servidor sem o script): a app usa um motor SIP próprio
+// (baresip, em motor.js) e mostra um telefone simples (paginas/telefone.html):
+// chamadas UDP/TCP como o Zoiper, sem chat.
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell, ipcMain, net, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell, ipcMain, net, dialog, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
 const MARCA = require('./marca.json');
+const { Motor } = require('./motor');
 const TESTE = (process.argv.find((a) => a.startsWith('--teste=')) || '').slice(8);
 const ESCONDIDO = process.argv.includes('--escondido');
+const TESTE_SIP = process.argv.includes('--teste-sip');
 
 // AppImage em distribuições recentes (Ubuntu 24.04+) não arranca com a sandbox do Chromium
 if (process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
@@ -38,6 +44,62 @@ function gravarConf(alteracoes) {
 }
 const servidor = () => (lerConf().servidor || MARCA.servidor || '').trim()
   .replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+/* ------------------------- Modo "Issabel normal" (motor SIP) ------------------------- */
+
+const EXE_MOTOR = process.platform === 'win32' ? 'baresip.exe' : 'baresip';
+const caminhoMotor = () => (app.isPackaged
+  ? path.join(process.resourcesPath, 'motor', EXE_MOTOR)
+  : path.join(__dirname, 'motor', 'bin', process.platform === 'win32' ? 'win' : 'linux', EXE_MOTOR));
+let motor = null;
+
+// A palavra-passe fica cifrada com a chave da sessão do sistema (DPAPI no Windows, keyring no Linux)
+function cifrar(t) {
+  if (safeStorage.isEncryptionAvailable()) return { c: safeStorage.encryptString(t).toString('base64') };
+  return { p: Buffer.from(t, 'utf8').toString('base64') };
+}
+function decifrar(o) {
+  try {
+    if (o?.c) return safeStorage.decryptString(Buffer.from(o.c, 'base64'));
+    if (o?.p) return Buffer.from(o.p, 'base64').toString('utf8');
+  } catch { /* chave mudou */ }
+  return '';
+}
+
+async function arrancarMotor() {
+  if (!motor) {
+    motor = new Motor(caminhoMotor(), path.join(app.getPath('userData'), 'sip'));
+    motor.on('evento', (ev) => {
+      janela?.webContents.send('motor-evento', ev);
+      if (ev.class === 'call' && ev.type === 'CALL_INCOMING') {
+        mostrar();
+        janela?.flashFrame(true);
+      }
+    });
+    motor.on('reiniciado', () => entrarComConta().catch(() => {}));
+  }
+  if (!motor.existe()) throw new Error(`Falta o motor SIP (${caminhoMotor()})`);
+  await motor.iniciar();
+}
+
+async function entrarComConta() {
+  const c = lerConf();
+  if (!c.sip) return { ok: false };
+  return motor.entrar({ ...c.sip, palavraPasse: decifrar(c.sip.passe) });
+}
+
+async function abrirTelefone() {
+  const c = lerConf();
+  try {
+    await arrancarMotor();
+    await entrarComConta();
+  } catch (e) {
+    return paginaLocal('erro', { motivo: String(e.message || e) });
+  }
+  janela.loadFile(path.join(__dirname, 'paginas', 'telefone.html'), {
+    query: { nome: MARCA.nome, extensao: c.sip.extensao },
+  });
+}
 
 /* ------------------------- Arrancar com o computador ------------------------- */
 
@@ -87,12 +149,15 @@ async function urlWebapp(s) {
 }
 
 function paginaLocal(modo, extra = {}) {
+  const sip = lerConf().sip || {};
   janela.loadFile(path.join(__dirname, 'paginas', 'inicio.html'), {
-    query: { modo, nome: MARCA.nome, servidor: servidor(), ...extra },
+    query: { modo, nome: MARCA.nome, servidor: servidor(), extensao: sip.extensao || '',
+      transporte: sip.transporte || 'udp', servidorSip: sip.servidor || '', ...extra },
   });
 }
 
 async function carregar() {
+  if (lerConf().modo === 'sip') return abrirTelefone();
   const s = servidor();
   if (!s) return paginaLocal('configurar');
   const url = await urlWebapp(s);
@@ -199,12 +264,39 @@ ipcMain.handle('definir-servidor', async (_e, s) => {
   s = String(s || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   if (!s) return { ok: false, erro: 'Indica o endereço do servidor.' };
   const url = await urlWebapp(s);
-  if (!url) return { ok: false, erro: `Não encontrei a webapp em https://${s}/ (o servidor foi preparado com o script do ${MARCA.nome}?)` };
+  if (!url) return { ok: false, erro: `Este servidor não tem a webapp do ${MARCA.nome} (falta o script). Para usar só chamadas, carrega em "Entrar só com chamadas".` };
   gravarConf({ servidor: s });
   janela.loadURL(url);
   return { ok: true };
 });
 ipcMain.handle('tentar-de-novo', () => carregar());
+
+// Modo "Issabel normal": guardar a conta, arrancar o motor e abrir o telefone
+ipcMain.handle('entrar-sip', async (_e, d) => {
+  const servidorSip = String(d?.servidor || '').trim().replace(/^sips?:/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  const extensao = String(d?.extensao || '').trim();
+  const palavraPasse = String(d?.palavraPasse || '');
+  const transporte = ['udp', 'tcp'].includes(d?.transporte) ? d.transporte : 'udp';
+  if (!servidorSip || !extensao || !palavraPasse) return { ok: false, erro: 'Preenche o servidor, a extensão e a palavra-passe.' };
+  gravarConf({ modo: 'sip', servidor: servidorSip.split(':')[0],
+    sip: { servidor: servidorSip, extensao, transporte, passe: cifrar(palavraPasse) } });
+  await abrirTelefone();
+  return { ok: true };
+});
+
+ipcMain.handle('sair-sip', async () => {
+  await motor?.sair().catch(() => {});
+  const c = lerConf();
+  gravarConf({ modo: null, sip: c.sip ? { ...c.sip, passe: null } : null });
+  paginaLocal('configurar', { sip: '1' });
+});
+
+// Comandos do telefone para o motor (números passam a URI SIP do servidor da conta)
+ipcMain.handle('motor', async (_e, comando, params) => {
+  if (!motor) return { ok: false, data: 'motor parado' };
+  if (['dial', 'transfer'].includes(comando)) params = motor.uri(params);
+  return motor.comando(String(comando), params);
+});
 
 /* ------------------------- Arranque ------------------------- */
 
@@ -225,12 +317,28 @@ if (!app.requestSingleInstanceLock()) {
       gravarConf({ arranqueDefinido: true });
     }
 
+    if (TESTE && TESTE_SIP) return testarMotor();
     if (!TESTE) criarBandeja();
     criarJanela();
   });
 
-  app.on('before-quit', () => { aSair = true; });
+  app.on('before-quit', () => { aSair = true; motor?.parar(); });
   app.on('window-all-closed', (e) => e.preventDefault()); // continua na bandeja
+}
+
+/** Teste automático (CI): o motor SIP incluído arranca, cria uma conta e responde. */
+async function testarMotor() {
+  try {
+    await arrancarMotor();
+    const a = await motor.comando('about');
+    const b = await motor.entrar({ servidor: '127.0.0.1', extensao: '100', palavraPasse: 'teste', transporte: 'udp' });
+    fs.writeFileSync(TESTE, `${a.ok && b.ok ? 'OK' : 'FALHA'} motor ${caminhoMotor()} about=${a.ok} conta=${b.ok}\n`);
+    await motor.parar();
+    app.exit(a.ok && b.ok ? 0 : 1);
+  } catch (e) {
+    fs.writeFileSync(TESTE, `FALHA motor ${e.message}\n`);
+    app.exit(1);
+  }
 }
 
 process.on('uncaughtException', (err) => {

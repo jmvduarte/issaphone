@@ -16,7 +16,12 @@ permissions:
   contents: write
 
 jobs:
+  # Motor SIP (baresip) do modo "Issabel normal": compilado e testado em motor-sip.yml
+  motor:
+    uses: ./.github/workflows/motor-sip.yml
+
   construir:
+    needs: motor
     name: ${{ matrix.marca }} · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -37,6 +42,16 @@ jobs:
       - name: Instalar dependências
         run: npm install --no-audit --no-fund
 
+      - name: Motor SIP
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os == 'Windows' && 'motor-windows' || 'motor-linux' }}
+          path: desktop/motor/bin/${{ runner.os == 'Windows' && 'win' || 'linux' }}
+
+      - name: Motor executável
+        if: runner.os == 'Linux'
+        run: chmod +x motor/bin/linux/baresip && ls -la motor/bin/linux
+
       - name: Gerar instaladores
         shell: bash
         env:
@@ -54,6 +69,14 @@ jobs:
           cat resultado.txt 2>/dev/null || echo "sem resultado"
           if grep -q '^OK' resultado.txt 2>/dev/null; then echo "::notice::$(cat resultado.txt)"; else echo "::error::Arranque falhou: $(cat resultado.txt 2>/dev/null)"; exit 1; fi
 
+      - name: Testar o motor SIP incluído (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a timeout 60 ./dist/${{ matrix.marca }}/linux-unpacked/${{ matrix.marca }} \
+            --no-sandbox --teste-sip --teste=$PWD/motor.txt || true
+          cat motor.txt 2>/dev/null || echo "sem resultado"
+          if grep -q '^OK' motor.txt 2>/dev/null; then echo "::notice::$(cat motor.txt)"; else echo "::error::Motor SIP: $(cat motor.txt 2>/dev/null)"; exit 1; fi
+
       - name: Testar arranque (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -65,6 +88,18 @@ jobs:
           $txt = if (Test-Path $res) { Get-Content $res -Raw } else { 'sem resultado' }
           Write-Host $txt
           if ($txt -match '^OK') { Write-Host "::notice::$txt" } else { Write-Host "::error::Arranque falhou: $txt"; exit 1 }
+
+      - name: Testar o motor SIP incluído (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $nome = if ('${{ matrix.marca }}' -eq 'issafone') { 'IssaFone' } else { 'IssaLink' }
+          $res = Join-Path $PWD 'motor.txt'
+          $p = Start-Process -FilePath ".\dist\${{ matrix.marca }}\win-unpacked\$nome.exe" -ArgumentList "--teste-sip","--teste=$res" -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill() }
+          $txt = if (Test-Path $res) { Get-Content $res -Raw } else { 'sem resultado' }
+          Write-Host $txt
+          if ($txt -match '^OK') { Write-Host "::notice::$txt" } else { Write-Host "::error::Motor SIP: $txt"; exit 1 }
 
       - uses: actions/upload-artifact@v4
         with:
