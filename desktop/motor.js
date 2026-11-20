@@ -135,7 +135,7 @@ class Motor extends EventEmitter {
         this.pendentes.get(msg.token)(msg);
         this.pendentes.delete(msg.token);
       } else if (msg.event) {
-        if (msg.class === 'register') this.registo = msg.type;
+        if (msg.class === 'register') { this.registo = msg.type; this.ultimoRegisto = msg; }
         this.emit('evento', msg);
       }
     }
@@ -164,7 +164,11 @@ class Motor extends EventEmitter {
     const pass = String(palavraPasse).replace(/;/g, '%3B');
     const linha = `${nomeTxt}<sip:${extensao}@${destino};transport=${transporte}>` +
       `;auth_pass=${pass};regint=60;answermode=manual;audio_codecs=pcma,pcmu;dtmfmode=rtpevent;video_codecs=;mwi=no`;
-    return this.comando('uanew', linha);
+    this.ultimoRegisto = null;
+    const r = await this.comando('uanew', linha);
+    // Garante que o registo arranca já (intervalo de 60 s) para a conta acabada de criar
+    if (r.ok) await this.comando('uafind', this.aor).then(() => this.comando('uareg', '60')).catch(() => {});
+    return r;
   }
 
   async sair() {

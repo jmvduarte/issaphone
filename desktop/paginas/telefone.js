@@ -171,11 +171,23 @@ $('okTransf').addEventListener('click', async () => {
 });
 
 /* ------------------------- Eventos do motor ------------------------- */
+let registado = false;
+function tratarRegisto(ev) {
+  if (ev.type === 'REGISTER_OK') { registado = true; estado(`Registado · extensão ${EXT}`, 'ok'); }
+  else if (ev.type === 'REGISTER_FAIL') { registado = false; estado(`Falhou: ${motivoRegisto(ev.param)}`, 'erro'); }
+  else if (ev.type === 'REGISTERING' && !registado) estado('A registar…');
+}
+function motivoRegisto(p) {
+  p = String(p || '');
+  if (/401|403|407/.test(p)) return 'palavra-passe ou extensão errada';
+  if (/404/.test(p)) return 'a extensão não existe no servidor';
+  if (/408|timeout|timed out/i.test(p)) return 'o servidor não responde';
+  return p || 'sem resposta';
+}
+
 D.aoEvento(async (ev) => {
   if (ev.class === 'register') {
-    if (ev.type === 'REGISTER_OK') estado(`Registado · extensão ${EXT}`, 'ok');
-    else if (ev.type === 'REGISTER_FAIL') estado(`Falhou: ${ev.param || 'sem resposta'}`, 'erro');
-    else if (ev.type === 'REGISTERING') estado('A registar…');
+    tratarRegisto(ev);
     return;
   }
   if (ev.class === 'motor' && ev.type === 'PAROU') { estado('O motor SIP parou; a reiniciar…', 'erro'); return; }
@@ -226,3 +238,13 @@ D.aoEvento(async (ev) => {
 
 $('sair').addEventListener('click', () => D.sairSip());
 estado(`A registar a extensão ${EXT}…`);
+// A resposta do servidor pode ter chegado antes de este ecrã abrir
+D.estadoMotor().then((ev) => { if (ev) tratarRegisto(ev); });
+// Sem resposta ao fim de 15 s: dizer porquê em vez de ficar a "registar" para sempre
+setTimeout(() => {
+  if (registado) return;
+  const p = document.querySelector('#estado span').textContent;
+  if (/^A registar/.test(p)) {
+    estado('O servidor não responde: confirma o endereço; no Windows, permite o IssaLink na firewall', 'erro');
+  }
+}, 15000);

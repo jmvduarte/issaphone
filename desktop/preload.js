@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('issaDesktop', {
   sairSip: () => ipcRenderer.invoke('sair-sip'),
   motor: (comando, params) => ipcRenderer.invoke('motor', comando, params),
   aoEvento: (fn) => ipcRenderer.on('motor-evento', (_e, ev) => fn(ev)),
+  estadoMotor: () => ipcRenderer.invoke('motor-estado'),
+  registoMotor: () => ipcRenderer.invoke('motor-log'),
   plataforma: process.platform,
 });

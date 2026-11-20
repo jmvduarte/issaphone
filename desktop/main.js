@@ -236,6 +236,10 @@ function menuBandeja() {
     },
     { label: 'Mudar de servidor…', click: () => { mostrar(); paginaLocal('configurar'); } },
     { label: 'Recarregar', click: () => { mostrar(); carregar(); } },
+    { label: 'Ver registo do motor SIP', click: () => {
+      const f = path.join(app.getPath('userData'), 'sip', 'motor.log');
+      if (fs.existsSync(f)) shell.openPath(f); else dialog.showMessageBox({ message: 'Ainda não há registo do motor SIP.' });
+    } },
     { type: 'separator' },
     { label: 'Sair', click: () => { aSair = true; app.quit(); } },
   ]);
@@ -290,6 +294,10 @@ ipcMain.handle('sair-sip', async () => {
   gravarConf({ modo: null, sip: c.sip ? { ...c.sip, passe: null } : null });
   paginaLocal('configurar', { sip: '1' });
 });
+
+// Estado atual do registo (o ecrã do telefone pede-o ao abrir, para não perder a resposta)
+ipcMain.handle('motor-estado', () => motor?.ultimoRegisto || null);
+ipcMain.handle('motor-log', () => motor?.ultimoLog(4000) || '');
 
 // Comandos do telefone para o motor (números passam a URI SIP do servidor da conta)
 ipcMain.handle('motor', async (_e, comando, params) => {
