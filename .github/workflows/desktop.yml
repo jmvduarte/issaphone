@@ -78,8 +78,6 @@ jobs:
   publicar:
     needs: construir
     runs-on: ubuntu-latest
-    env:
-      ISSALINK_TOKEN: ${{ secrets.ISSALINK_TOKEN }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -110,25 +108,15 @@ jobs:
 
             A app fica na bandeja do sistema e arranca com o computador, para receberes chamadas com a janela fechada.
 
-      - name: Publicar IssaLink (repositório issalink)
-        if: env.ISSALINK_TOKEN != ''
+      # IssaLink: pré-lançamento "issalink-desktop-N"; o repositório jmvduarte/issalink copia-o
+      # sozinho para a sua Release "desktop-N".
+      - name: Publicar IssaLink (origem para jmvduarte/issalink)
         uses: softprops/action-gh-release@v2
         with:
-          repository: jmvduarte/issalink
-          token: ${{ secrets.ISSALINK_TOKEN }}
-          tag_name: desktop-${{ github.run_number }}
-          name: IssaLink para computador 1.0.${{ github.run_number }}
+          tag_name: issalink-desktop-${{ github.run_number }}
+          name: IssaLink para computador ${{ github.run_number }} · ver jmvduarte/issalink
+          prerelease: true
           make_latest: false
           files: instaladores/IssaLink-*
           body: |
-            **IssaLink para computador** (versão 1.0.${{ github.run_number }}) — pede o endereço do teu servidor na primeira vez.
-
-            | Sistema | Ficheiro |
-            |---|---|
-            | Windows 10/11 | `IssaLink-win-x64.exe` |
-            | Linux (qualquer) | `IssaLink-linux-x86_64.AppImage` |
-            | Ubuntu/Debian | `IssaLink-linux-amd64.deb` |
-
-            Precisa do servidor preparado com o [guia](https://github.com/jmvduarte/issalink/blob/main/GUIA-SERVIDOR.md) (usa a webapp do servidor).
-            - **Windows:** instalador não assinado: *Mais informações → Executar mesmo assim*.
-            - **AppImage:** `chmod +x IssaLink-linux-x86_64.AppImage` · **.deb:** `sudo apt install ./IssaLink-linux-amd64.deb`.
+            O IssaLink tem repositório próprio: **https://github.com/jmvduarte/issalink** (descarrega de lá).
